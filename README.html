@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Converter - Gebruikershandleiding</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #00bcd4;
+            border-bottom: 3px solid #00bcd4;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #333;
+            border-left: 4px solid #00bcd4;
+            padding-left: 15px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #555;
+        }
+        .step {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .step-number {
+            background: #00bcd4;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .feature {
+            background: #e8f5e8;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .tip {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .file-format {
+            display: inline-block;
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 2px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Data Converter - Gebruikershandleiding</h1>
+
+        <h2>Overzicht</h2>
+        <p>De Data Converter is een intelligente webapplicatie waarmee u automatisch Excel bestanden van verschillende bronnen kunt converteren naar een gestandaardiseerd formaat. De applicatie gebruikt geavanceerde patroonherkenning en biedt drie verwerkingsmethoden:</p>
+
+        <div class="feature">
+            <strong>🔄 Verwerkingsflows:</strong><br>
+            <span class="file-format">Automatische Herkenning</span>
+            <span class="file-format">Template Matching</span>
+            <span class="file-format">Custom Mapping</span>
+        </div>
+
+        <div class="tip">
+            <strong>💡 Procesoverzicht:</strong> Voor een goed begrip van deze applicatie, bekijk eerst deze
+            <a href="flowchart.html" target="_blank" style="color: #00bcd4; text-decoration: none; font-weight: bold;">📊 interactieve processchema</a>.
+        </div>
+
+        <h2>Eerste Gebruik</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Template Aanmaken</strong><br>
+            Bij eerste gebruik moet u eerst een algemeen template aanmaken door een Excel bestand te uploaden of een bestaande JSON template file van een collega te importeren. Dit template bevat alle vereiste velden voor de gestandaardiseerde uitvoer.
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Instellingen Configureren</strong><br>
+            Klik op het tandwiel-icoon (⚙️) rechts bovenin om:
+            <ul>
+                <li>Uw naam in te stellen voor de audit trail</li>
+                <li>Een voorkeursmap voor downloads te selecteren</li>
+            </ul>
+        </div>
+
+        <h2>Bestanden Verwerken</h2>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <strong>Bestanden Uploaden</strong><br>
+            Ga naar het tabblad "Upload Files" en:
+            <ul>
+                <li>Sleep bestanden naar de uploadzone, of</li>
+                <li>Klik op "Browse Files" om bestanden te selecteren</li>
+                <li>Ondersteunde formaten: <code>.xlsx</code>, <code>.pdf</code></li>
+            </ul>
+        </div>
+
+        <div class="tip">
+            <strong>Intelligente Herkenning:</strong> De applicatie analyseert automatisch de bestandsstructuur en gebruikt opgeslagen templates voor herkenning. Onbekende formaten worden doorgeleid naar de File Mapping tab voor aangepaste verwerking.
+        </div>
+
+        <div class="step">
+            <span class="step-number">4</span>
+            <strong>Resultaten Bekijken</strong><br>
+            Na succesvolle verwerking navigeert de applicatie automatisch naar het tabblad "Results" waar u:
+            <ul>
+                <li>Een overzicht ziet van alle verwerkte bestanden</li>
+                <li>De eerste 3 en laatste 3 records per bestand kunt bekijken</li>
+                <li>Kunt zoeken in de gegevens</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">5</span>
+            <strong>Gegevens Downloaden</strong><br>
+            In het Results tabblad kunt u:
+            <ul>
+                <li><strong>Download Excel:</strong> Alle data in één Excel-bestand</li>
+                <li><strong>Export JSON:</strong> Data in JSON-formaat voor verdere verwerking</li>
+            </ul>
+        </div>
+
+        <h2>Problemen Oplossen</h2>
+
+        <h3>Onbekende Bestandsformaten</h3>
+        <div class="warning">
+            Als een bestand niet automatisch wordt herkend, navigeert de applicatie naar het tabblad "File Mapping" waar u handmatig een mapping kunt maken.
+        </div>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Custom File Mapping Maken</strong><br>
+            In het "File Mapping" tabblad kunt u:
+            <ul>
+                <li>Kolommen uit het bronbestand slepen naar de template-velden</li>
+                <li>Vaste waarden instellen door op een template-veld te klikken</li>
+                <li>Auto-mapping gebruiken voor automatische suggesties</li>
+                <li>De mapping opslaan voor toekomstig gebruik</li>
+                <li>Keywords toewijzen voor automatische herkenning</li>
+            </ul>
+        </div>
+
+        <h2>Templates en Mappings Delen met Collega's</h2>
+
+        <div class="feature">
+            <strong>🔄 JSON Export/Import Systeem:</strong> Deel eenvoudig uw templates en file mappings met teamleden via JSON bestanden.
+        </div>
+
+        <h3>Templates Delen</h3>
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Template Exporteren</strong><br>
+            In het "Templates" tabblad:
+            <ul>
+                <li>Selecteer het template dat u wilt delen</li>
+                <li>Klik op "Export Template" om een JSON bestand te downloaden</li>
+                <li>Deel dit JSON bestand met uw collega's via email of gedeelde mappen</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Template Importeren</strong><br>
+            Uw collega's kunnen het template gebruiken door:
+            <ul>
+                <li>Naar het "Templates" tabblad te gaan</li>
+                <li>Op "Import Template" te klikken</li>
+                <li>Het JSON bestand te selecteren dat u hebt gedeeld</li>
+            </ul>
+        </div>
+
+        <h3>File Mappings Delen</h3>
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Mapping Exporteren</strong><br>
+            In het "File Mapping" tabblad:
+            <ul>
+                <li>Maak een file mapping voor een specifiek bestandsformaat</li>
+                <li>Klik op "Save Broker Template" om automatisch een JSON backup te downloaden</li>
+                <li>Het bestand bevat zowel de mapping als de parsing configuratie</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Mapping Importeren</strong><br>
+            Collega's kunnen de mapping gebruiken door:
+            <ul>
+                <li>Naar het "File Mapping" tabblad te gaan</li>
+                <li>Op "Import Template JSON" te klikken</li>
+                <li>Het gedeelde JSON bestand te selecteren</li>
+                <li>Een keyword toe te voegen voor automatische herkenning</li>
+            </ul>
+        </div>
+
+        <div class="tip">
+            <strong>💡 Teamwork Tip:</strong> Maak een gedeelde netwerkmap waar het hele team JSON bestanden kan opslaan en ophalen. Zo heeft iedereen toegang tot dezelfde templates en mappings.
+        </div>
+
+        <h3>Automatische Keyword Herkenning</h3>
+        <div class="feature">
+            Na het importeren van een file mapping kunnen uw collega's:
+            <ul>
+                <li>Een <strong>keyword</strong> toevoegen (bijvoorbeeld "DeVerkoper" of "ClientNaam")</li>
+                <li>Bestanden die dit keyword in de naam bevatten worden automatisch verwerkt</li>
+                <li>Geen handmatige mapping meer nodig voor toekomstige bestanden!</li>
+            </ul>
+        </div>
+
+        <h2>Geavanceerde Functies</h2>
+
+        <h3>Template Beheer</h3>
+        <div class="feature">
+            In het "Templates" tabblad kunt u:
+            <ul>
+                <li>Nieuwe templates maken of bestaande bewerken</li>
+                <li>Templates importeren/exporteren als JSON</li>
+                <li>Kolommen toevoegen, bewerken of verwijderen</li>
+            </ul>
+        </div>
+
+        <h3>File Mapping Opslaan</h3>
+        <div class="feature">
+            Wanneer u een mapping heeft gemaakt in het "File Mapping" tabblad, kunt u deze opslaan als herbruikbaar template voor toekomstige bestanden van hetzelfde formaat.
+        </div>
+
+        <h3>Zoek- en Filterfunctionaliteit</h3>
+        <div class="feature">
+            In het Results tabblad kunt u real-time zoeken in alle getoonde records om specifieke gegevens snel te vinden.
+        </div>
+
+        <h2>Tips voor Optimaal Gebruik</h2>
+
+        <div class="tip">
+            <strong>Keywords:</strong> Voeg betekenisvolle keywords toe aan uw file mappings. Bestanden met deze keywords in de naam worden automatisch verwerkt.
+        </div>
+
+        <div class="tip">
+            <strong>Batch Verwerking:</strong> U kunt meerdere bestanden tegelijk uploaden. De applicatie verwerkt ze sequentieel en navigeert automatisch naar het juiste tabblad.
+        </div>
+
+        <div class="tip">
+            <strong>Download Locatie:</strong> Stel eenmalig uw voorkeursmap in via Instellingen. Alle downloads openen dan automatisch in deze map.
+        </div>
+
+        <div class="tip">
+            <strong>Data Validatie:</strong> Controleer altijd de preview voordat u data downloadt om er zeker van te zijn dat de mapping correct is.
+        </div>
+
+        <h2>Technische Vereisten</h2>
+        <ul>
+            <li><strong>Browser:</strong> Moderne browser met JavaScript ingeschakeld</li>
+            <li><strong>Bestanden:</strong> Excel (.xlsx) (toekomst: PDF bestanden)</li>
+            <li><strong>Internet:</strong> Niet vereist na eerste laden (offline gebruik mogelijk)</li>
+        </ul>
+
+        <div class="warning">
+            <strong>Privacynota:</strong> Alle gegevens worden lokaal in uw browser verwerkt. Er worden geen bestanden naar externe servers verzonden.
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+{
+  "id": "template_1759491084546",
+  "name": "BorderellenJSON",
+  "description": "Template automatically created from template.xlsx (22 columns)",
+  "version": "1.0",
+  "columns": [
+    {
+      "id": 1,
+      "name": "Makelaar",
+      "type": "text",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 2,
+      "name": "Boekingsperiode",
+      "type": "date",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 3,
+      "name": "Polisnr makelaar",
+      "type": "number",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 4,
+      "name": "Verzekerde",
+      "type": "text",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 5,
+      "name": "Branche",
+      "type": "text",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 6,
+      "name": "Periode van",
+      "type": "date",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 7,
+      "name": "Periode tot",
+      "type": "date",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 8,
+      "name": "Valuta",
+      "type": "text",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 9,
+      "name": "Bruto",
+      "type": "number",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 10,
+      "name": "Provisie%",
+      "type": "number",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 11,
+      "name": "Provisie",
+      "type": "number",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 12,
+      "name": "Tekencom%",
+      "type": "number",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 13,
+      "name": "Tekencom",
+      "type": "number",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 14,
+      "name": "Netto",
+      "type": "number",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 15,
+      "name": "BAB",
+      "type": "text",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 16,
+      "name": "Land",
+      "type": "text",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 17,
+      "name": "Aandeel Allianz",
+      "type": "number",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 18,
+      "name": "Tekenjaar",
+      "type": "number",
+      "required": true,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 19,
+      "name": "Boekdatum tp",
+      "type": "date",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 20,
+      "name": "FactuurDtm",
+      "type": "date",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 21,
+      "name": "FactuurNr",
+      "type": "number",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    },
+    {
+      "id": 22,
+      "name": "Boekingsreden",
+      "type": "text",
+      "required": false,
+      "description": "Auto-imported from template.xlsx"
+    }
+  ],
+  "originalFileName": "template.xlsx",
+  "createdDate": "2025-10-03T11:31:24.546Z",
+  "importedFrom": "Borderellen.json"
+}

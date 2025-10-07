@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Mapping Process Flow</title>
+    <script src="https://unpkg.com/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #00bcd4;
+            text-align: center;
+        }
+        .mermaid {
+            text-align: center;
+        }
+        .code-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #00bcd4;
+        }
+        .code-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .step-box {
+            margin: 15px 0;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Auto-Mapping Algorithm Process Flow</h1>
+
+        <div class="mermaid">
+            flowchart TD
+                A["User clicks Auto Map button"] --> B["app.js: generateAutoMapping()"]
+                B --> C["Get sourceColumnNames from Excel"]
+                B --> D["Get templateColumns from borderellenTemplate"]
+
+                C --> E["AutoMapping.generateMappingSuggestions()"]
+                D --> E
+
+                E --> F["Build N×M Confidence Matrix"]
+                F --> G["For each source × template pair"]
+                G --> H["AutoMapping.calculateColumnMatchConfidence()"]
+
+                H --> I["normalizeString on both names"]
+                I --> J{"Are normalized strings identical?"}
+
+                J -->|Yes| K["Return 100.0 - EXACT MATCH"]
+                J -->|No| L["Calculate fuzzy scores"]
+
+                L --> M["Character Similarity: Levenshtein × 50"]
+                M --> N["Substring Coverage: coverage × 30"]
+                N --> O["Word Overlap: overlap × 20"]
+                O --> P["Length Penalty: diff × 0.5"]
+
+                P --> Q["Sum scores, cap at 99 max"]
+                Q --> R["Store in confidenceMatrix[i][j]"]
+
+                R --> S{"More pairs to calculate?"}
+                S -->|Yes| G
+                S -->|No| T["performOptimalAssignment()"]
+
+                T --> U["Flatten matrix to allPairs array"]
+                U --> V["Sort by confidence DESC"]
+                V --> W["Greedy assignment loop"]
+
+                W --> X["Take highest unused pair"]
+                X --> Y{"Source and Template both unused?"}
+                Y -->|Yes| Z["Assign pair, mark as used"]
+                Y -->|No| AA["Skip pair"]
+
+                Z --> BB{"More pairs available?"}
+                AA --> BB
+                BB -->|Yes| X
+                BB -->|No| CC["Filter by threshold >= 30%"]
+
+                CC --> DD["Return final mapping object"]
+                DD --> EE["Update UI with results"]
+
+                style K fill:#4caf50,color:#fff
+                style Q fill:#ff9800,color:#fff
+                style DD fill:#2196f3,color:#fff
+        </div>
+
+        <div class="code-section">
+            <h3>🔍 Key Functions Called</h3>
+            <div class="step-box">
+                <strong>1. app.js:generateAutoMapping()</strong><br>
+                Entry point - gets source columns and calls AutoMapping
+            </div>
+            <div class="step-box">
+                <strong>2. AutoMapping.generateMappingSuggestions()</strong><br>
+                Main orchestrator - builds matrix and performs assignment
+            </div>
+            <div class="step-box">
+                <strong>3. AutoMapping.calculateColumnMatchConfidence()</strong><br>
+                Core scoring logic - exact match vs fuzzy scores
+            </div>
+            <div class="step-box">
+                <strong>4. AutoMapping.performOptimalAssignment()</strong><br>
+                Greedy algorithm - assigns highest scores first
+            </div>
+        </div>
+
+        <div class="code-section">
+            <h3>⚠️ Potential Issue Points</h3>
+            <div class="step-box">
+                <strong>Issue A: normalizeString() Over-Normalization</strong><br>
+                "Makelaar" and "Polisnr makelaar" might become identical after normalization
+            </div>
+            <div class="step-box">
+                <strong>Issue B: Greedy Assignment Conflicts</strong><br>
+                Even with correct scores, first-come-first-served might pick wrong pairs
+            </div>
+            <div class="step-box">
+                <strong>Issue C: Input Data Problems</strong><br>
+                Source or template column names might not be what you expect
+            </div>
+        </div>
+
+        <div class="code-section">
+            <h3>🛠️ Debugging Steps</h3>
+            <div class="step-box">
+                <strong>Step 1:</strong> Check console logs for "Comparing: X -> Y with A -> B"<br>
+                Verify the actual column names being compared
+            </div>
+            <div class="step-box">
+                <strong>Step 2:</strong> Look for "Score breakdown" logs<br>
+                See individual charSim, substring, wordOverlap, penalty scores
+            </div>
+            <div class="step-box">
+                <strong>Step 3:</strong> Check "MAPPED" vs "SKIPPED" final assignments<br>
+                See which pairs made it through the assignment algorithm
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+/**
+ * Borderellen Converter - Responsive Styles
+ * Tablet and mobile responsive design
+ */
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .mapping-container {
+        grid-template-columns: 1fr;
+    }
+
+    .tab-nav {
+        overflow-x: auto;
+    }
+
+    .container {
+        height: 100vh;
+    }
+
+    .section {
+        padding: 16px;
+    }
+
+    .tab-content {
+        padding: 16px;
+    }
+
+    .header {
+        padding: 12px 16px;
+    }
+
+    .form-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+
+    .data-table {
+        font-size: 14px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px;
+    }
+
+    .btn {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+
+    .modal {
+        min-width: 320px;
+        max-width: 95vw;
+        margin: 16px;
+    }
+
+    .upload-zone {
+        padding: 32px 16px;
+    }
+
+    .upload-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-title {
+        font-size: 16px;
+    }
+
+    .tab-button {
+        padding: 12px 16px;
+        font-size: 13px;
+    }
+
+    .section-title {
+        font-size: 14px;
+    }
+
+    .mapping-container {
+        gap: 16px;
+    }
+
+    .mapping-panel {
+        padding: 16px;
+    }
+
+    .column-item {
+        padding: 8px;
+        font-size: 13px;
+    }
+}

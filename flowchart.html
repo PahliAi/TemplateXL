@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borderellen Converter - Processchema</title>
+    <script src="src/lib/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #00bcd4;
+            border-bottom: 3px solid #00bcd4;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .flowchart-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .description {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #00bcd4;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .success { background-color: #28a745; }
+        .warning { background-color: #ffc107; }
+        .error { background-color: #dc3545; }
+        .process { background-color: #007bff; }
+        .decision { background-color: #6f42c1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Borderellen Converter - Processchema</h1>
+
+        <div class="description">
+            <h3>Overzicht van het Verwerkingsproces (v0.51 - Geoptimaliseerde Flow)</h3>
+            <p>Dit schema toont de volledige workflow van het uploaden van borderelbestanden tot het downloaden van gestandaardiseerde data. Het proces gebruikt nu een intelligente 3-flow architectuur met geoptimaliseerde pattern analysis en unified file mapping systeem voor maximale efficiëntie.</p>
+        </div>
+
+        <div class="flowchart-container">
+            <div id="flowchart"></div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color success"></div>
+                <span><strong>Succesvol:</strong> Automatische verwerking gelukt</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color warning"></div>
+                <span><strong>Handmatig:</strong> Gebruikersinteractie vereist</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color error"></div>
+                <span><strong>Probleem:</strong> Fout of onbekend formaat</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color process"></div>
+                <span><strong>Proces:</strong> Automatische verwerking</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #90ee90;"></div>
+                <span><strong>FLOW 1:</strong> Built-in parsers (AON/VGA/BCI/Voogt)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ffa500;"></div>
+                <span><strong>FLOW 2:</strong> Custom templates (keyword-matched)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff6b6b;"></div>
+                <span><strong>FLOW 3:</strong> Onbekend formaat (pattern analysis)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4ecdc4;"></div>
+                <span><strong>Geoptimaliseerd:</strong> Gecachte pattern analysis</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        const flowchartDefinition = `
+        flowchart TD
+            Start([🚀 App Opstarten]) --> Template{Template<br/>Beschikbaar?}
+
+            Template -->|Ja| UploadTab[📁 Navigeer naar<br/>Upload Files Tab]
+            Template -->|Nee| SelectTemplate[📋 Selecteer Template<br/>in Templates Tab]
+            SelectTemplate --> UploadTab
+
+            UploadTab --> Upload[📤 Gebruiker Upload<br/>Bestanden]
+            Upload --> DetectType{🔍 Detecteer<br/>Bestandstype}
+
+            DetectType -->|AON/VGA/BCI/Voogt| BuiltInFlow[🟢 FLOW 1: Built-in Parser<br/>Directe Verwerking]
+            DetectType -->|Keyword Match| CustomFlow[🟡 FLOW 2: Custom Template<br/>Auto-toegepast via Keyword]
+            DetectType -->|Onbekend| UnknownFlow[🔴 FLOW 3: Onbekend Formaat<br/>Pattern Analysis]
+
+            BuiltInFlow --> AONProcess[⚙️ AON Parser]
+            BuiltInFlow --> VGAProcess[⚙️ VGA Parser]
+            BuiltInFlow --> BCIProcess[⚙️ BCI Parser]
+            BuiltInFlow --> VoogtProcess[⚙️ Voogt Parser]
+
+            CustomFlow --> LoadTemplate[📋 Laad Unified File Mapping<br/>met parsingConfig & columnMapping]
+            LoadTemplate --> ValidateCustom{✅ Template<br/>Validatie}
+
+            UnknownFlow --> PatternAnalysis[🔍 DataPatternAnalyzer<br/>Eenmalige 2D Density Analysis]
+            PatternAnalysis --> CacheAnalysis[💾 Cache Analysis in<br/>fileData.patternAnalysis]
+            CacheAnalysis --> ShowOptions[❓ Toon Template Selectie<br/>of Maak Nieuwe Mapping]
+
+            ShowOptions --> UserChoice{👤 Gebruiker<br/>Keuze}
+            UserChoice -->|Selecteer Template| SelectExisting[📋 Selecteer Bestaande<br/>Template uit Dropdown]
+            UserChoice -->|Maak Mapping| BrokerMapping[🗺️ Navigeer naar<br/>Broker Mapping Tab]
+
+            SelectExisting --> ApplyExistingTemplate[🔄 Pas Bestaande Template toe<br/>met parsingConfig]
+            BrokerMapping --> UseCache[⚡ Gebruik Cached Analysis<br/>voor Source Columns]
+            UseCache --> CreateMapping[👤 Gebruiker Maakt<br/>Kolom Mapping met Skip Rules]
+
+            AONProcess --> ValidateAON{✅ Data<br/>Validatie}
+            VGAProcess --> ValidateVGA{✅ Data<br/>Validatie}
+            BCIProcess --> ValidateBCI{✅ Data<br/>Validatie}
+            VoogtProcess --> ValidateVoogt{✅ Data<br/>Validatie}
+
+            ValidateCustom --> CustomSuccess[✅ Auto-verwerkt met<br/>Keyword Template]
+            ApplyExistingTemplate --> ExistingSuccess[✅ Verwerkt met<br/>Bestaande Template]
+
+            CreateMapping --> SaveTemplate{💾 Template<br/>Opslaan?}
+            SaveTemplate -->|Ja| SaveUnifiedMapping[💾 Unified File Mapping<br/>Opgeslagen in fileMappings]
+            SaveTemplate -->|Nee| ApplyMapping[🔄 Mapping Toepassen<br/>met Skip Rules]
+            SaveUnifiedMapping --> ApplyMapping
+            ApplyMapping --> PreviewMapping[👁️ Preview Resultaten<br/>met Cached Analysis]
+
+            ValidateAON -->|Success| SuccessData[✅ Data Succesvol<br/>Verwerkt]
+            ValidateVGA -->|Success| SuccessData
+            ValidateBCI -->|Success| SuccessData
+            ValidateVoogt -->|Success| SuccessData
+            CustomSuccess --> SuccessData
+            ExistingSuccess --> SuccessData
+
+            ValidateAON -->|Fout| ErrorData[❌ Verwerkingsfout]
+            ValidateVGA -->|Fout| ErrorData
+            ValidateBCI -->|Fout| ErrorData
+            ValidateVoogt -->|Fout| ErrorData
+            ValidateCustom -->|Fout| ErrorData
+
+            ErrorData --> BrokerMapping
+            PreviewMapping --> ManualResults[📈 Handmatig naar<br/>Results Tab]
+
+            SuccessData --> CheckAllFiles{📊 Alle Bestanden<br/>Succesvol?}
+            CheckAllFiles -->|Ja| AutoResults[🎯 Auto-navigatie naar<br/>Results Tab]
+            CheckAllFiles -->|Nee| AutoBrokerMapping[🎯 Auto-navigatie naar<br/>Broker Mapping Tab]
+
+            AutoResults --> ShowResults[📈 Toon Gecombineerde<br/>Resultaten]
+            AutoBrokerMapping --> BrokerMapping
+            ManualResults --> ShowResults
+
+            ShowResults --> DisplayData[📋 Toon Sample Data<br/>3 Eerste + 3 Laatste<br/>per Bestand]
+            DisplayData --> SearchFilter[🔍 Zoek & Filter<br/>Functionaliteit]
+            SearchFilter --> ExportOptions{📥 Export<br/>Opties}
+
+            ExportOptions -->|Excel| DownloadExcel[📊 Download Excel<br/>Alle Data]
+            ExportOptions -->|JSON| DownloadJSON[📄 Download JSON<br/>Alle Data]
+
+            DownloadExcel --> PreferredFolder{📁 Voorkeursmap<br/>Ingesteld?}
+            DownloadJSON --> PreferredFolder
+
+            PreferredFolder -->|Ja| FolderPicker[📂 Windows Explorer<br/>Opent in Voorkeursmap]
+            PreferredFolder -->|Nee| DefaultDownload[⬇️ Standaard Browser<br/>Download]
+
+            FolderPicker --> SaveFile[💾 Bestand Opgeslagen<br/>op Gekozen Locatie]
+            DefaultDownload --> SaveFile
+            SaveFile --> Complete([🎉 Proces Voltooid])
+
+            %% Styling
+            classDef successClass fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
+            classDef warningClass fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404
+            classDef errorClass fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24
+            classDef processClass fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px,color:#0c5460
+            classDef decisionClass fill:#e2e3f0,stroke:#6f42c1,stroke-width:2px,color:#493176
+            classDef flow1Class fill:#90ee90,stroke:#28a745,stroke-width:3px,color:#155724
+            classDef flow2Class fill:#ffa500,stroke:#ff8c00,stroke-width:3px,color:#b8860b
+            classDef flow3Class fill:#ff6b6b,stroke:#dc3545,stroke-width:3px,color:#721c24
+            classDef cacheClass fill:#4ecdc4,stroke:#17a2b8,stroke-width:2px,color:#0c5460
+
+            class SuccessData,CustomSuccess,ExistingSuccess,AutoResults,ShowResults,SaveFile,Complete successClass
+            class CreateMapping,SaveTemplate,BrokerMapping,PreviewMapping,ManualResults,FolderPicker,ShowOptions,UserChoice warningClass
+            class ErrorData,UnknownFlow,AutoBrokerMapping errorClass
+            class Upload,DetectType,ApplyMapping,DisplayData,SearchFilter,DownloadExcel,DownloadJSON,LoadTemplate,ApplyExistingTemplate processClass
+            class Template,ValidateAON,ValidateVGA,ValidateBCI,ValidateVoogt,ValidateCustom,CheckAllFiles,ExportOptions,PreferredFolder decisionClass
+            class BuiltInFlow,AONProcess,VGAProcess,BCIProcess,VoogtProcess flow1Class
+            class CustomFlow flow2Class
+            class PatternAnalysis,UseCache,CacheAnalysis cacheClass
+            class SaveUnifiedMapping flow3Class
+        `;
+
+        const element = document.getElementById('flowchart');
+        mermaid.render('flowchart-svg', flowchartDefinition).then(result => {
+            element.innerHTML = result.svg;
+        });
+    </script>
+</body>
+</html>

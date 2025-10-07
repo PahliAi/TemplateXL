@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borderellen Converter</title>
+
+    <!-- SheetJS Library -->
+    <script src="src/lib/xlsx.full.min.js"></script>
+
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="src/css/main.css">
+    <link rel="stylesheet" href="src/css/components.css">
+    <link rel="stylesheet" href="src/css/responsive.css">
+    <link rel="stylesheet" href="src/css/broker-builder.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="app-icon">⚡</div>
+            <h1 class="app-title">Borderellen Converter</h1>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-button active" data-tab="template">Templates</button>
+            <button class="tab-button" data-tab="upload">Upload Files</button>
+            <button class="tab-button" data-tab="mapping">File Mapping</button>
+            <button class="tab-button" data-tab="results">Results</button>
+            <button class="tab-button" data-tab="email">Email Recipients</button>
+
+            <!-- Navigation Icons -->
+            <div style="margin-left: auto; display: flex; gap: 8px; margin-right: 24px;">
+                <!-- Flowchart Icon -->
+                <button class="btn btn-secondary" id="flowchart-btn" title="Processchema" style="padding: 12px; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #17a2b8; border-color: #17a2b8;">
+                    📊
+                </button>
+
+                <!-- Contact Management Icon -->
+                <button class="btn btn-secondary" id="contacts-btn" title="Contact Management" style="padding: 12px; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #28a745; border-color: #28a745;">
+                    👥
+                </button>
+
+                <!-- Help Icon -->
+                <button class="btn btn-secondary" id="help-btn" title="Gebruikershandleiding" style="padding: 12px; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #007bff; border-color: #007bff;">
+                    ❓
+                </button>
+
+                <!-- Settings Icon -->
+                <button class="btn btn-secondary" id="settings-btn" title="Instellingen" style="padding: 12px; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+                    ⚙️
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- Tab 1: Template Configuration -->
+            <div class="tab-content active" id="template-tab">
+
+                <!-- Main Template Selector Section -->
+                <div class="section" id="template-main-section">
+                    <h2 class="section-title">Template Configuration</h2>
+                    <p class="section-subtitle">Select an existing template or create a new one for your data processing.</p>
+
+                    <!-- Current Active Template Display -->
+                    <div id="active-template-display" style="background: #333; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 style="color: #00bcd4; margin: 0; font-size: 18px;" id="active-template-name">No Template Selected</h3>
+                                <p style="color: #888; margin: 4px 0 0 0; font-size: 14px;" id="active-template-info">Please select a template from the dropdown below</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Template Selector -->
+                    <div class="form-group">
+                        <label class="form-label" for="template-selector">Available Templates</label>
+                        <p class="form-help" style="color: #888; font-size: 14px; margin: 4px 0 8px 0;">Select a template from the dropdown to activate it immediately.</p>
+                        <select class="form-input" id="template-selector" style="max-width: 400px;">
+                            <option value="">Choose a template...</option>
+                        </select>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; gap: 12px; margin-top: 20px;">
+                        <button class="btn btn-secondary" id="edit-template-btn" disabled>Edit Template</button>
+                        <button class="btn" id="new-template-btn">New Template</button>
+                        <button class="btn btn-secondary" id="delete-template-btn" disabled>Delete</button>
+                    </div>
+                </div>
+
+                <!-- New Template Creation Section (Hidden by default) -->
+                <div class="section" id="new-template-section" style="display: none;">
+                    <h3 class="section-title">Create New Template</h3>
+                    <p class="section-subtitle">Upload an Excel file to automatically detect columns, or create a template manually.</p>
+
+                    <!-- Template Upload Zone -->
+                    <div class="upload-zone" id="template-upload-zone" style="margin-bottom: 16px;">
+                        <div class="upload-icon">📋</div>
+                        <div class="upload-text">Upload Template File</div>
+                        <div class="upload-subtext">Drop Excel (.xlsx) or JSON (.json) file here to load template</div>
+                    </div>
+
+                    <!-- Hidden template file input -->
+                    <input type="file" id="template-file-input" accept=".xlsx,.xls,.json" style="display: none;">
+
+                    <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                        <button class="btn" id="browse-template-btn">Browse File (Excel/JSON)</button>
+                        <button class="btn btn-secondary" id="create-manual-btn">Create Manual Template</button>
+                        <button class="btn btn-secondary" id="cancel-new-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Edit Template Section (Hidden by default) -->
+                <div class="section" id="edit-template-section" style="display: none;">
+                    <h3 class="section-title">Edit Template</h3>
+                    <p class="section-subtitle">Modify template properties and column configuration.</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" class="form-input" id="template-name-input"
+                               placeholder="Enter template name"
+                               onchange="updateTemplateName(this.value)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Template Description (Optional)</label>
+                        <input type="text" class="form-input" id="template-desc-input"
+                               placeholder="Enter description for this template"
+                               onchange="updateTemplateDescription(this.value)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Matching Keyword</label>
+                        <input type="text" class="form-input" id="template-keyword-input"
+                               placeholder="Enter keyword to match files (e.g., 'Verkoper')"
+                               onchange="updateTemplateKeyword(this.value)">
+                        <small class="form-help">Files containing this keyword will automatically use this template</small>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                        <button class="btn" id="save-template-btn">Save Changes</button>
+                        <button class="btn btn-secondary" id="cancel-edit-btn">Cancel</button>
+                        <button class="btn btn-secondary" id="export-template-btn">Export JSON</button>
+                    </div>
+                </div>
+
+                <!-- Column Configuration Section (Hidden by default) -->
+                <div class="section" id="column-config-section" style="display: none;">
+                    <h3 class="section-title">Column Configuration</h3>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Column Name</th>
+                                    <th>Data Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="template-table-body">
+                                <!-- Dynamic content will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn" id="add-column-btn">Add Column</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Tab 2: Upload Files -->
+            <div class="tab-content" id="upload-tab">
+                <div class="section">
+                    <h2 class="section-title">Upload Source Files</h2>
+                    <p class="section-subtitle">Upload Excel or PDF files from different sources. Files will be auto-detected by filename pattern.</p>
+
+                    <!-- Main Upload Zone -->
+                    <div class="upload-zone" id="upload-zone">
+                        <div class="upload-icon">📁</div>
+                        <div class="upload-text">Drop files here or click to browse</div>
+                        <div class="upload-subtext">Supports: Excel (.xlsx), PDF (.pdf) - Multiple files allowed</div>
+                    </div>
+
+                    <!-- Hidden file input -->
+                    <input type="file" id="file-input" multiple accept=".xlsx,.xls,.pdf" style="display: none;">
+
+                    <div style="display: flex; gap: 16px; margin: 16px 0;">
+                        <button class="btn" id="browse-btn">Browse Files</button>
+                        <button class="btn btn-secondary" id="clear-all-btn">Clear All</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">Uploaded Files</h3>
+
+                    <div id="no-files-message" style="text-align: center; padding: 32px; color: #888;">
+                        <p>No files uploaded yet. Use the upload zone above to add files.</p>
+                    </div>
+
+                    <div id="files-table-container" style="display: none;">
+                        <div style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Filename</th>
+                                        <th>Source Type</th>
+                                        <th>File Size</th>
+                                        <th>Status</th>
+                                        <th>Records</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="files-table-body">
+                                    <!-- Dynamic content will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Tab 3: File Mapping -->
+            <div class="tab-content" id="mapping-tab">
+                <div class="section">
+                    <h2 class="section-title">Interactive File Mapping</h2>
+                    <p class="section-subtitle">Create file mappings by dragging columns from uploaded files to Borderellen template fields. Auto-mapping suggestions will be provided.</p>
+
+                    <div class="form-group">
+                        <label class="form-label" for="mapping-file-selector">Select Uploaded File</label>
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <select class="form-input" id="mapping-file-selector" style="max-width: 300px;" title="Select Uploaded File">
+                                <option value="">No files uploaded</option>
+                            </select>
+                            <div id="mapping-summary" style="display: none; background: #333; padding: 8px 12px; border-radius: 4px; font-size: 12px;">
+                                <span id="mapping-summary-text"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mapping-container">
+                    <!-- Template Columns (Drop Zones) -->
+                    <div class="mapping-panel">
+                        <h3 class="mapping-panel-title">Template Fields (Drop Here)</h3>
+                        <div class="column-list" id="template-drop-zones">
+                            <!-- Dynamic content will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Source Columns (Draggable) -->
+                    <div class="mapping-panel">
+                        <h3 class="mapping-panel-title">Source File Columns (Drag From Here)</h3>
+                        <div class="column-list" id="source-columns">
+                            <div style="text-align: center; padding: 32px; color: #888;">
+                                <p>Select a file to see available columns</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mapping-buttons-container">
+                    <button class="btn" id="auto-map-btn">Auto-Map Suggestions</button>
+                    <button class="btn btn-secondary" id="save-broker-template-btn">Save Broker Template</button>
+                    <button class="btn btn-secondary" id="import-broker-template-btn">Import Template JSON</button>
+                    <button class="btn btn-secondary" id="clear-mapping-btn">Clear Mapping</button>
+                    <button class="btn" id="process-with-template-btn">Process with Template</button>
+                </div>
+
+                <!-- Hidden file input for importing broker templates -->
+                <input type="file" id="broker-template-file-input" accept=".json" style="display: none;">
+
+                <!-- File Mapping Keyword Management Section -->
+                <div class="section" id="keyword-management-section">
+                    <h3 class="section-title">File Mapping Keyword Management</h3>
+                    <p class="section-subtitle">View and manage keywords for automatic file mapping. Files containing these keywords will automatically use the corresponding mapping configuration.</p>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <span id="template-count-display" style="color: #888;"></span>
+                        </div>
+                        <div>
+                            <button class="btn btn-secondary" id="refresh-templates-btn">Refresh Templates</button>
+                        </div>
+                    </div>
+
+                    <!-- Templates with Keywords Table -->
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" id="keyword-templates-table">
+                            <thead>
+                                <tr>
+                                    <th>File Mapping Name</th>
+                                    <th>Matching Keyword</th>
+                                    <th>Creation Method</th>
+                                    <th>Last Modified</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keyword-templates-table-body">
+                                <!-- Dynamic content will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="no-templates-message" style="text-align: center; padding: 32px; color: #888; display: none;">
+                        <p>No file mappings found.</p>
+                        <small>Create file mappings by dragging columns in the interface above.</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Filled Broker Template -->
+            <div class="tab-content" id="results-tab">
+                <div class="section">
+                    <h2 class="section-title">Filled Broker Template</h2>
+                    <p class="section-subtitle">View and download processed data from all uploaded files in the standard 22-column format.</p>
+
+                    <!-- Processing Overview -->
+                    <div id="processing-overview">
+                        <div id="no-data-message" style="text-align: center; padding: 40px; color: #888;">
+                            <p>No processed files available.</p>
+                            <small>Upload source files in the Upload tab to see processed data here.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" id="processed-data-section" style="display: none;">
+                    <h3 class="section-title">Combined Data Preview</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <input type="text" id="search-records" class="form-input" placeholder="Search records..." style="max-width: 300px;">
+                            <span id="record-count-display" style="margin-left: 16px; color: #888;"></span>
+                        </div>
+                        <div>
+                            <button class="btn" id="download-excel-btn">Download Excel</button>
+                            <button class="btn btn-secondary" id="export-json-btn" style="margin-left: 8px;">Export JSON</button>
+                            <button class="btn btn-secondary" id="refresh-data-btn" style="margin-left: 8px;">Refresh</button>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div style="overflow-x: auto; max-height: 600px; overflow-y: auto;">
+                        <table class="data-table" id="results-table">
+                            <thead id="results-table-head">
+                                <!-- Dynamic headers will be added here -->
+                            </thead>
+                            <tbody id="results-table-body">
+                                <!-- Dynamic content will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination (if needed) -->
+                    <div id="pagination-controls" style="margin-top: 16px; text-align: center;">
+                        <!-- Pagination will be added if there are many records -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Email Recipients -->
+            <div class="tab-content" id="email-tab">
+                <div class="section">
+                    <h2 class="section-title">Email Recipients - Missing Data Analysis</h2>
+                    <p class="section-subtitle">Analyze missing data in source files and send email notifications for incomplete records.</p>
+
+                    <!-- Data Source Selection -->
+                    <div class="form-group">
+                        <label class="form-label">Data Source</label>
+                        <div style="display: flex; gap: 16px; margin-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                <input type="radio" name="data-source" value="results" id="use-results-data" checked>
+                                <span>Use current Results data</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                <input type="radio" name="data-source" value="upload" id="use-upload-data">
+                                <span>Upload new files</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- File Upload Section (Hidden by default) -->
+                    <div id="email-upload-section" style="display: none;">
+                        <div class="upload-zone" id="email-upload-zone">
+                            <div class="upload-icon">📧</div>
+                            <div class="upload-text">Upload Source Files for Analysis</div>
+                            <div class="upload-subtext">Drop Excel (.xlsx) files here - Multiple files allowed</div>
+                        </div>
+                        <input type="file" id="email-file-input" multiple accept=".xlsx,.xls" style="display: none;">
+                        <div style="display: flex; gap: 16px; margin: 16px 0;">
+                            <button class="btn" id="email-browse-btn">Browse Files</button>
+                            <button class="btn btn-secondary" id="email-clear-files-btn">Clear Files</button>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Status -->
+                    <div id="analysis-status" style="margin-top: 20px; padding: 16px; background: #333; border-radius: 8px; display: none;">
+                        <h3 style="color: #00bcd4; margin-bottom: 12px;">Analysis Status</h3>
+                        <div id="analysis-progress"></div>
+                    </div>
+                </div>
+
+                <!-- Email Template Configuration -->
+                <div class="section" id="email-template-section" style="display: none;">
+                    <h3 class="section-title">Email Template Configuration</h3>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Subject</label>
+                        <input type="text" class="form-input" id="email-subject"
+                               value="Ontbrekende data in uw borderellen">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Body Template</label>
+                        <textarea class="form-input" id="email-body-template" rows="12"
+                                  style="font-family: monospace; font-size: 13px; line-height: 1.4;">Geachte heer/mevrouw {contact_last_name},
+
+Wij hebben uw borderellen bestand {filename} met {total_rows} boekingen in goede orde ontvangen.
+Er ontbreekt echter data, waardoor wij niet in staat zijn deze boekingen snel en accuraat te verwerken.
+
+Gelieve onderstaande gegevens aan te vullen en aan ons te retourneren.
+
+{missing_data_table}
+
+Bedankt voor uw medewerking.
+
+Met vriendelijke groet,
+
+{user_signature}</textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-top: 16px;">
+                        <button class="btn" id="save-email-template-btn">Save Email Template</button>
+                        <button class="btn btn-secondary" id="reset-email-template-btn">Reset to Default</button>
+                    </div>
+                </div>
+
+                <!-- Missing Data Analysis Results -->
+                <div class="section" id="missing-data-results" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 class="section-title">Missing Data Analysis Results</h3>
+                        <div>
+                            <button class="btn btn-secondary" id="refresh-analysis-btn">Refresh Analysis</button>
+                            <button class="btn" id="send-emails-btn" style="margin-left: 8px;">Generate Emails</button>
+                        </div>
+                    </div>
+
+                    <div id="broker-analysis-summary" style="margin-bottom: 20px;"></div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" id="missing-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source Name</th>
+                                    <th>Contact Person</th>
+                                    <th>Total Rows</th>
+                                    <th>Missing Data Columns</th>
+                                    <th>Completion %</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="missing-data-table-body">
+                                <!-- Dynamic content will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Broker Contact Matching -->
+                <div id="contact-matching-modal" class="modal-overlay">
+                    <div class="modal" style="max-width: 500px;">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Select Recipient Contact</h2>
+                            <button class="modal-close" id="close-contact-matching">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <p id="contact-matching-message"></p>
+                            <div class="form-group">
+                                <label class="form-label">Select Contact</label>
+                                <select class="form-input" id="broker-contact-selector">
+                                    <option value="">Choose a contact...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" id="skip-contact-btn">Skip This Source</button>
+                            <button class="btn" id="confirm-contact-btn">Confirm Selection</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filename Assignment Modal -->
+                <div id="filename-assignment-modal" class="modal-overlay">
+                    <div class="modal" style="max-width: 600px;">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Assign Filenames to Recipients</h2>
+                            <button class="modal-close" id="close-filename-assignment">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Some recipients need filename assignment for the email {filename} placeholder:</p>
+                            <div id="filename-assignments-container"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" id="skip-filename-assignments">Use Default Names</button>
+                            <button class="btn" id="confirm-filename-assignments">Confirm Assignments</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Settings</h2>
+                <button class="modal-close" id="close-settings-modal">×</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Your Name</label>
+                    <input type="text" class="form-input" id="user-name-input"
+                           placeholder="Enter your name for audit trail"
+                           value="User">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-input" id="user-email-input"
+                           placeholder="Enter your email address"
+                           value="">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Signature</label>
+                    <textarea class="form-input" id="user-signature-input"
+                              placeholder="Enter your email signature (optional)"
+                              rows="3"
+                              style="resize: vertical; min-height: 80px;"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Preferred Download Folder</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" class="form-input" id="download-folder-input"
+                               placeholder="Default browser download folder will be used"
+                               style="flex: 1;" readonly>
+                        <button class="btn btn-secondary" id="select-folder-btn">Browse</button>
+                    </div>
+                    <p style="font-size: 12px; color: #888; margin-top: 8px;">
+                        Note: Browser security requires user approval for each download to a specific folder.
+                    </p>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-settings-btn">Cancel</button>
+                <button class="btn" id="save-settings-btn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="preview-modal">
+        <div class="modal" style="max-width: 95%; width: 1200px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2 class="modal-title">Preview Results</h2>
+                <button class="modal-close" id="close-preview-modal">×</button>
+            </div>
+
+            <div class="modal-body" style="max-height: calc(90vh - 140px); overflow-y: auto;">
+                <div id="preview-content">
+                    <div class="section">
+                        <h3 class="section-title">Mapping Summary</h3>
+                        <div id="preview-mapping-summary"></div>
+                    </div>
+
+                    <div class="section">
+                        <h3 class="section-title">Sample Output (First 5 Records)</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="data-table" id="preview-table">
+                                <thead id="preview-table-head">
+                                    <!-- Dynamic headers will be added here -->
+                                </thead>
+                                <tbody id="preview-table-body">
+                                    <!-- Dynamic content will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3 class="section-title">Statistics</h3>
+                        <div id="preview-stats"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="position: sticky; bottom: 0; background: #1a1a1a; border-top: 1px solid #404040; margin-top: auto;">
+                <button class="btn btn-secondary" id="close-preview-btn">Close</button>
+                <button class="btn" id="export-preview-btn">Export as Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Management Modal -->
+    <div class="modal-overlay" id="contacts-modal">
+        <div class="modal" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <h2 class="modal-title">Recipient Contact Management</h2>
+                <button class="modal-close" id="close-contacts-modal">×</button>
+            </div>
+
+            <div class="modal-body" style="max-height: calc(90vh - 140px); overflow-y: auto;">
+                <!-- Contact Form -->
+                <div class="section" id="contact-form-section">
+                    <h3 class="section-title" id="form-section-title">Add New Contact</h3>
+                    <form id="contact-form">
+                        <div class="form-group">
+                            <label class="form-label">Organization Name *</label>
+                            <input type="text" class="form-input" id="contact-broker-name"
+                                   placeholder="Enter organization name" required>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" class="form-input" id="contact-first-name"
+                                       placeholder="Enter first name" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" class="form-input" id="contact-last-name"
+                                       placeholder="Enter last name" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Email Address *</label>
+                            <input type="email" class="form-input" id="contact-email"
+                                   placeholder="Enter email address" required>
+                        </div>
+                        <div style="display: flex; gap: 12px; margin-top: 16px;">
+                            <button type="submit" class="btn" id="save-contact-btn">Save Contact</button>
+                            <button type="button" class="btn btn-secondary" id="cancel-contact-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Contact List -->
+                <div class="section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 class="section-title">Saved Contacts</h3>
+                        <div>
+                            <button class="btn btn-secondary" id="import-contacts-btn">Import JSON</button>
+                            <button class="btn btn-secondary" id="export-contacts-btn" style="margin-left: 8px;">Export JSON</button>
+                        </div>
+                    </div>
+
+                    <div id="contacts-list-container">
+                        <div id="no-contacts-message" style="text-align: center; padding: 32px; color: #888;">
+                            <p>No recipient contacts saved yet.</p>
+                        </div>
+
+                        <div style="overflow-x: auto; display: none;" id="contacts-table-container">
+                            <table class="data-table" id="contacts-table">
+                                <thead>
+                                    <tr>
+                                        <th>Organization</th>
+                                        <th>Contact Person</th>
+                                        <th>Email</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contacts-table-body">
+                                    <!-- Dynamic content will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="close-contacts-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for importing contacts -->
+    <input type="file" id="contacts-file-input" accept=".json" style="display: none;">
+
+    <!-- Template Builder Container -->
+
+    <!-- JavaScript Modules -->
+    <script src="src/js/storageManager.js"></script>
+    <script src="src/js/excelCacheManager.js"></script>
+    <script src="src/js/dataPatternAnalyzer.js"></script>
+    <script src="src/js/autoMapping.js"></script>
+    <script src="src/js/genericParser.js"></script>
+    <script src="src/js/customBrokerTemplateManager.js"></script>
+    <script src="src/js/calculationEngine.js"></script>
+    <script src="src/js/brokerParsers.js"></script>
+    <script src="src/js/fileManager.js"></script>
+    <script src="src/js/templateManager.js"></script>
+
+    <!-- UI Management Modules -->
+    <script src="src/js/modalManager.js"></script>
+    <script src="src/js/dragDropManager.js"></script>
+    <script src="src/js/headerSelectionManager.js"></script>
+    <script src="src/js/previewManager.js"></script>
+    <script src="src/js/resultsManager.js"></script>
+    <script src="src/js/emailManager.js"></script>
+    <script src="src/js/contactManager.js"></script>
+
+    <!-- Main Application Controller -->
+    <script src="src/js/app.js"></script>
+</body>
+</html>

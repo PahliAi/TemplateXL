@@ -1,0 +1,528 @@
+/**
+ * Borderellen Converter - Component Styles
+ * UI components, forms, buttons, tables, modals
+ */
+
+/* Button Styles */
+.btn {
+    background: #00bcd4;
+    color: #000;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    background: #00acc1;
+}
+
+.btn-secondary {
+    background: #404040;
+    color: #ffffff;
+}
+
+.btn-secondary:hover {
+    background: #555;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #ffffff;
+}
+
+.form-input {
+    width: 100%;
+    background: #333;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #00bcd4;
+}
+
+/* Table Styles */
+.data-table {
+    width: 100%;
+    background: #333;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #404040;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #404040;
+}
+
+.data-table th {
+    background: #404040;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.data-table td {
+    color: #ffffff;
+}
+
+.data-table tr:hover {
+    background: #3a3a3a;
+}
+
+/* Manual Header Selection Modal */
+.header-cell {
+    transition: background-color 0.1s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.header-cell:hover {
+    background-color: #404040 !important;
+}
+
+.header-cell.selecting {
+    background-color: #00bcd4 !important;
+    color: #000 !important;
+}
+
+/* Prevent text selection during drag operations */
+.no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Modal overlay styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+    color: white;
+    border: 1px solid #404040;
+}
+
+/* Header selection grid styles */
+#header-selection-table {
+    border-collapse: collapse;
+    font-family: 'Courier New', monospace;
+}
+
+#header-selection-table th,
+#header-selection-table td {
+    border: 1px solid #555;
+    text-align: center;
+    vertical-align: middle;
+}
+
+#header-selection-table th {
+    background: #404040;
+    color: #888;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Selection status and instructions */
+.selection-instructions {
+    background: #333;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    color: #ccc;
+    border-left: 4px solid #00bcd4;
+}
+
+.selection-status {
+    color: #00bcd4;
+    font-weight: 500;
+}
+
+/* Context Menu Styles */
+.context-menu {
+    position: fixed;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 8px 0;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.15s ease;
+    pointer-events: none;
+}
+
+.context-menu.show {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+    font-size: 14px;
+}
+
+.context-menu-item:hover {
+    background-color: #00bcd4;
+    color: #000;
+}
+
+.context-menu-item .icon {
+    margin-right: 10px;
+    font-size: 16px;
+    width: 20px;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: #555;
+    margin: 4px 0;
+}
+
+.context-menu-item.disabled {
+    color: #666;
+    cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+    background-color: transparent;
+    color: #666;
+}
+
+/* Enhanced Drop Zone Styles for Mapping Types */
+.drop-zone.filled.fixed-value {
+    background: #1a237e !important;
+    border-color: #3f51b5 !important;
+}
+
+.drop-zone.filled.calculation {
+    background: #e65100 !important;
+    border-color: #ff9800 !important;
+}
+
+.drop-zone.filled.column-mapping {
+    background: #1b5e20 !important;
+    border-color: #4caf50 !important;
+}
+
+.mapping-type-indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-weight: bold;
+}
+
+/* Mapping Interface Styles */
+.mapping-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    min-height: 400px;
+    margin-bottom: 30px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mapping-panel {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid #404040;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+    max-height: none;
+    overflow: visible;
+}
+
+.mapping-panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #ffffff;
+}
+
+.column-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    max-height: calc(100vh - 300px);
+}
+
+.column-item {
+    background: #333;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 12px;
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.column-item:hover {
+    background: #3a3a3a;
+    border-color: #00bcd4;
+}
+
+.column-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.drop-zone {
+    min-height: 48px;
+    border: 2px dashed #404040;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.drop-zone.drag-over {
+    border-color: #00bcd4;
+    background: #004d55;
+    color: #00bcd4;
+}
+
+.drop-zone:hover {
+    border-color: #666;
+    background: #333;
+}
+
+.drop-zone.filled {
+    background: #333;
+    border-color: #00bcd4;
+    color: #ffffff;
+}
+
+.drop-zone.filled:hover {
+    background: #3a3a3a;
+    border-color: #00acc1;
+}
+
+/* Mapping Buttons Container */
+.mapping-buttons-container {
+    clear: both;
+    margin-top: 30px;
+    padding: 20px;
+    text-align: center;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border: 1px solid #404040;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mapping-buttons-container .btn {
+    margin: 4px 8px;
+}
+
+/* Ensure mapping tab has proper spacing when active */
+#mapping-tab.active {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+#mapping-tab .section:last-child {
+    margin-bottom: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#mapping-tab .mapping-container {
+    flex: 0 0 auto;
+}
+
+#mapping-tab .mapping-buttons-container {
+    flex: 0 0 auto;
+    margin-top: auto;
+}
+
+/* Status and Progress */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-success {
+    background: #4caf50;
+}
+
+.status-warning {
+    background: #ff9800;
+}
+
+/* File Mapping Type Badges */
+.template-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.template-type-custom {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.template-type-broker {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.status-error {
+    background: #f44336;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #404040;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #00bcd4;
+    transition: width 0.3s ease;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal {
+    background: #2a2a2a;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+    border: 1px solid #404040;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #404040;
+    padding-bottom: 16px;
+}
+
+.modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    color: #ffffff;
+    background: #404040;
+}
+
+.modal-body {
+    margin-bottom: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    border-top: 1px solid #404040;
+    padding-top: 16px;
+}
