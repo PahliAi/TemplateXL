@@ -19,6 +19,309 @@ window.currentMappingFile = null; // Make this globally accessible
 window.currentMapping = {}; // Make this globally accessible
 window.currentPatternAnalysis = null; // Make this globally accessible
 
+// Persistent file-mapping context state
+window.fileMappingContext = {
+    fileId: null,              // ID of the file being mapped
+    fileName: null,            // Name for display
+    mappingTemplateId: null,   // Associated template ID
+    mappingName: null,         // Template name for display
+    isActive: false,           // Whether context is valid
+    lastUpdated: null          // Timestamp of last update
+};
+
+// ========== FILE-MAPPING CONTEXT MANAGEMENT ==========
+
+/**
+ * Save current file-mapping context
+ */
+function saveFileMappingContext(fileData, templateId, templateName) {
+    window.fileMappingContext = {
+        fileId: fileData.id,
+        fileName: fileData.name,
+        mappingTemplateId: templateId,
+        mappingName: templateName,
+        isActive: true,
+        lastUpdated: new Date().toISOString()
+    };
+
+    // Persist to sessionStorage for page refresh
+    try {
+        sessionStorage.setItem('fileMappingContext', JSON.stringify(window.fileMappingContext));
+        console.log('File-mapping context saved:', window.fileMappingContext);
+    } catch (error) {
+        console.warn('Could not save context to sessionStorage:', error);
+    }
+
+    // Update UI
+    updateFileMappingContextBanner();
+}
+
+/**
+ * Restore file-mapping context from storage
+ */
+async function restoreFileMappingContext() {
+    try {
+        // Try to restore from sessionStorage first
+        const savedContext = sessionStorage.getItem('fileMappingContext');
+        if (savedContext) {
+            const context = JSON.parse(savedContext);
+
+            // Validate that the file still exists in uploadedFiles
+            const fileExists = window.uploadedFiles && window.uploadedFiles.find(f => f.id === context.fileId);
+
+            if (fileExists && context.isActive) {
+                window.fileMappingContext = context;
+                console.log('File-mapping context restored:', context);
+
+                // Auto-select the file in the mapping tab
+                const fileSelector = document.getElementById('mapping-file-selector');
+                if (fileSelector && fileSelector.value !== context.fileId.toString()) {
+                    fileSelector.value = context.fileId;
+                    await loadSourceColumns(context.fileId);
+                }
+
+                // Load the template mapping if available
+                if (context.mappingTemplateId) {
+                    await loadTemplateMapping(context.mappingTemplateId);
+                }
+
+                updateFileMappingContextBanner();
+                return true;
+            } else {
+                console.log('Context invalid or file no longer available');
+                clearFileMappingContext();
+            }
+        }
+    } catch (error) {
+        console.warn('Error restoring context:', error);
+    }
+
+    return false;
+}
+
+/**
+ * Clear file-mapping context
+ */
+function clearFileMappingContext() {
+    window.fileMappingContext = {
+        fileId: null,
+        fileName: null,
+        mappingTemplateId: null,
+        mappingName: null,
+        isActive: false,
+        lastUpdated: null
+    };
+
+    try {
+        sessionStorage.removeItem('fileMappingContext');
+    } catch (error) {
+        console.warn('Could not clear context from sessionStorage:', error);
+    }
+
+    updateFileMappingContextBanner();
+    console.log('File-mapping context cleared');
+}
+
+/**
+ * Update context banner UI
+ */
+function updateFileMappingContextBanner() {
+    const banner = document.getElementById('file-mapping-context-banner');
+    if (!banner) return;
+
+    if (window.fileMappingContext.isActive) {
+        banner.style.display = 'block';
+        banner.innerHTML = `
+            <div style="background: #e8f4f8; padding: 16px; margin-bottom: 16px; border-radius: 8px; border-left: 4px solid #00bcd4;">
+                <div style="display: flex; justify-content: space-between; align-items: center; color: black;">
+                    <div>
+                        <strong style="color: #00bcd4;">Active Mapping Context</strong><br>
+                        <span style="font-size: 14px;">File: <strong>${window.fileMappingContext.fileName}</strong></span><br>
+                        <span style="font-size: 14px;">Template: <strong>${window.fileMappingContext.mappingName || 'Unsaved'}</strong></span>
+                        <span style="font-size: 12px; color: #888; margin-left: 8px;">(${window.fileMappingContext.mappingTemplateId ? 'Saved' : 'Not saved yet'})</span>
+                    </div>
+                    <button class="btn btn-secondary" onclick="clearFileMappingContext()" style="padding: 8px 16px;">
+                        Clear Context
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        banner.style.display = 'none';
+    }
+
+    // Update button visibility based on context
+    updateMappingButtons();
+}
+
+/**
+ * Update Save/Update button visibility based on context
+ */
+function updateMappingButtons() {
+    const saveBtn = document.getElementById('save-broker-template-btn');
+    const updateBtn = document.getElementById('update-broker-template-btn');
+
+    if (!saveBtn || !updateBtn) return;
+
+    if (window.fileMappingContext.isActive && window.fileMappingContext.mappingTemplateId) {
+        // Context exists with saved template - show Update button
+        saveBtn.style.display = 'none';
+        updateBtn.style.display = 'inline-block';
+    } else {
+        // No context or unsaved - show Save button
+        saveBtn.style.display = 'inline-block';
+        updateBtn.style.display = 'none';
+    }
+}
+
+/**
+ * Load template mapping from IndexedDB
+ */
+async function loadTemplateMapping(templateId) {
+    try {
+        const allMappings = await window.loadAllFileMappings();
+        const template = allMappings.find(t => t.id === templateId);
+
+        if (template && template.columnMapping) {
+            window.currentMapping = { ...template.columnMapping };
+            console.log('Template mapping loaded:', window.currentMapping);
+
+            // Update drop zones to show the loaded mappings
+            updateTemplateDropZones();
+
+            return true;
+        } else {
+            console.warn('Template not found or has no column mapping:', templateId);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error loading template mapping:', error);
+        return false;
+    }
+}
+
+/**
+ * Edit file mapping from keyword management table
+ */
+async function editFileMappingFromTable(templateId, templateName) {
+    try {
+        console.log('Edit mapping requested for template:', templateId, templateName);
+
+        // Load the template from storage
+        const allMappings = await window.loadAllFileMappings();
+        const template = allMappings.find(t => t.id === templateId);
+
+        if (!template) {
+            alert(`Template "${templateName}" not found in database.`);
+            return;
+        }
+
+        // Try to find a matching file in uploadedFiles
+        let matchingFile = null;
+
+        if (window.uploadedFiles && window.uploadedFiles.length > 0) {
+            // Try exact filename match first (if metadata exists)
+            if (template.metadata && template.metadata.lastUsedFileName) {
+                matchingFile = window.uploadedFiles.find(f => f.name === template.metadata.lastUsedFileName);
+            }
+
+            // Try keyword match
+            if (!matchingFile && template.matchingKeyword) {
+                const keyword = template.matchingKeyword.toLowerCase();
+                matchingFile = window.uploadedFiles.find(f => f.name.toLowerCase().includes(keyword));
+            }
+
+            // Try source name match
+            if (!matchingFile && template.sourceName) {
+                matchingFile = window.uploadedFiles.find(f =>
+                    f.broker && f.broker.name === template.sourceName
+                );
+            }
+        }
+
+        // If file found: Load it and the template
+        if (matchingFile) {
+            console.log('Found matching file:', matchingFile.name);
+
+            // Set current file
+            window.currentMappingFile = matchingFile;
+
+            // Load the template mapping FIRST
+            window.currentMapping = { ...template.columnMapping };
+
+            // Store pattern analysis if available BEFORE loading columns
+            if (template.parsingConfig) {
+                window.currentPatternAnalysis = {
+                    dataSection: {
+                        headerRowIndex: template.parsingConfig.headerRow,
+                        dataStartIndex: template.parsingConfig.skipRows,
+                        startColumnIndex: template.parsingConfig.skipColumns,
+                        endColumnIndex: template.parsingConfig.endColumn
+                    },
+                    manualSelection: template.parsingConfig.headerRows ? {
+                        headerRows: template.parsingConfig.headerRows,
+                        headerColumns: template.parsingConfig.headerColumns,
+                        headerRange: template.parsingConfig.headerRange,
+                        footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                    } : null,
+                    suggestedHeaderRow: template.parsingConfig.headerRow,
+                    autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
+                    confidence: 1.0
+                };
+            }
+
+            // Update file's broker info to link to this template
+            matchingFile.broker = {
+                type: 'custom',
+                name: template.name,
+                templateId: template.id
+            };
+
+            // Save context
+            saveFileMappingContext(matchingFile, template.id, template.name);
+
+            // Load the file's columns LAST (this will use the restored pattern analysis)
+            await loadSourceColumns(matchingFile.id);
+
+            // Update UI
+            updateTemplateDropZones();
+
+            // Switch to mapping tab
+            const mappingTab = document.querySelector('[data-tab="mapping"]');
+            if (mappingTab) {
+                mappingTab.click();
+            }
+
+            // Show success message
+            alert(`Editing template "${templateName}".\n\nFile: ${matchingFile.name}\n\nMake your changes and click "Update Template" to save.`);
+
+        } else {
+            // No file found: Prompt user to upload
+            const uploadFile = confirm(
+                `Template "${templateName}" loaded, but no matching file is currently uploaded.\n\n` +
+                `Matching keyword: "${template.matchingKeyword || 'None'}"\n\n` +
+                `Would you like to go to the Upload tab to add a file?`
+            );
+
+            if (uploadFile) {
+                const uploadTab = document.querySelector('[data-tab="upload"]');
+                if (uploadTab) {
+                    uploadTab.click();
+                }
+
+                alert(`Please upload a file matching keyword "${template.matchingKeyword || template.sourceName}" and then click "Edit Mapping" again.`);
+            }
+        }
+
+    } catch (error) {
+        console.error('Error editing file mapping:', error);
+        alert(`Error loading template for editing: ${error.message}`);
+    }
+}
+
+// Expose function globally
+window.editFileMappingFromTable = editFileMappingFromTable;
+
 // ========== UI STATE MANAGEMENT ==========
 
 function showMainSection() {
@@ -86,7 +389,7 @@ function getBrokerAutoMapping(brokerType, filename) {
     const mappings = {};
 
     switch (brokerType) {
-        case 'AON':
+        case 'AON': {
             // Extract period from filename
             const aonMatch = filename.match(/(\d{2}-\d{4})/);
             const aonPeriod = aonMatch ? aonMatch[1] : '';
@@ -104,8 +407,9 @@ function getBrokerAutoMapping(brokerType, filename) {
             mappings['Tekenjaar'] = 'Tekenjaar';
             mappings['Boekingsreden'] = 'FactuurTekst';
             break;
+        }
 
-        case 'VGA':
+        case 'VGA': {
             // Extract period and code from filename
             const vgaMatch = filename.match(/^VGA (\d{2}-\d{4}) (A\d{3})\.xlsx$/i);
             const vgaPeriod = vgaMatch ? vgaMatch[1] : '';
@@ -121,8 +425,9 @@ function getBrokerAutoMapping(brokerType, filename) {
             mappings['Bruto'] = 'Bruto premie EB';
             mappings['Netto'] = 'Netto Maatschappij EB';
             break;
+        }
 
-        case 'BCI':
+        case 'BCI': {
             // Extract period from filename
             const bciMatch = filename.match(/^BCI (\d{4}-Q[1-4])\.xlsx$/i);
             const bciPeriod = bciMatch ? bciMatch[1] : '';
@@ -140,8 +445,9 @@ function getBrokerAutoMapping(brokerType, filename) {
             mappings['Netto'] = 'FIXED:From row 1, column 7';
             mappings['Bruto'] = 'FIXED:From row 2, column 5';
             break;
+        }
 
-        case 'Voogt':
+        case 'Voogt': {
             // Extract period from filename
             const voogtMatch = filename.match(/^Voogt (\d{2}) (\d{4})\.xlsx$/i);
             const voogtPeriod = voogtMatch ? `${voogtMatch[1]} ${voogtMatch[2]}` : '';
@@ -156,6 +462,7 @@ function getBrokerAutoMapping(brokerType, filename) {
             mappings['Provisie'] = 'FIXED:Column P (position 15)';
             mappings['Bruto'] = 'FIXED:Column S (position 18)';
             break;
+        }
 
         default:
             console.log(`No auto-mapping defined for broker type: ${brokerType}`);
@@ -192,6 +499,67 @@ async function loadSourceColumns(fileId) {
     if (!fileData) return;
 
     window.currentMappingFile = fileData;
+
+    // Clear old context first - will be restored below if this file has a saved template
+    clearFileMappingContext();
+
+    // Check if this file has a saved template and restore the context
+    if (fileData.broker && fileData.broker.type === 'custom' && fileData.broker.templateId) {
+        console.log(`File has saved template: ${fileData.broker.name} (ID: ${fileData.broker.templateId})`);
+
+        // Load the template to restore mappings
+        try {
+            const allMappings = await window.loadAllFileMappings();
+            const template = allMappings.find(t => t.id === fileData.broker.templateId);
+
+            if (template) {
+                // Restore the file mapping context
+                saveFileMappingContext(fileData, template.id, template.name);
+
+                // Restore the column mapping
+                window.currentMapping = { ...template.columnMapping };
+
+                // CRITICAL: Restore pattern analysis from saved parsing config
+                if (template.parsingConfig) {
+                    window.currentPatternAnalysis = {
+                        dataSection: {
+                            headerRowIndex: template.parsingConfig.headerRow,
+                            dataStartIndex: template.parsingConfig.skipRows,
+                            startColumnIndex: template.parsingConfig.skipColumns,
+                            endColumnIndex: template.parsingConfig.endColumn
+                        },
+                        manualSelection: template.parsingConfig.headerRows ? {
+                            headerRows: template.parsingConfig.headerRows,
+                            headerColumns: template.parsingConfig.headerColumns,
+                            headerRange: template.parsingConfig.headerRange,
+                            footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                        } : null,
+                        suggestedHeaderRow: template.parsingConfig.headerRow,
+                        autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                    };
+                    console.log(`Restored pattern analysis from template:`, window.currentPatternAnalysis);
+                }
+
+                console.log(`Restored template context: ${template.name} with ${Object.keys(window.currentMapping).length} mappings`);
+
+                // Store restored analysis in fileData to prevent re-analysis overwriting it
+                fileData.patternAnalysis = window.currentPatternAnalysis;
+
+                // Update UI buttons to show "Update Template" instead of "Save New Template"
+                updateMappingButtons();
+
+                // Load columns with restored analysis and return early to skip normal analysis flow
+                const container = document.getElementById('source-columns');
+                await loadSourceColumnsFromAnalysis(fileData.file, window.currentPatternAnalysis, container);
+                return;
+            } else {
+                console.warn(`Template ${fileData.broker.templateId} not found in database`);
+            }
+        } catch (error) {
+            console.error('Error restoring template context:', error);
+        }
+    }
+
     const container = document.getElementById('source-columns');
 
     try {
@@ -269,7 +637,8 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
                             let headerText = '';
 
                             if (cell && cell.v) {
-                                headerText = cell.v.toString().trim();
+                                // Normalize: remove line breaks, collapse multiple spaces to single space
+                                headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
                             } else {
                                 headerText = `Row${row + 1}_Col${XLSX.utils.encode_col(col)}`;
                             }
@@ -285,7 +654,8 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
                         let headerText = '';
 
                         if (cell && cell.v) {
-                            headerText = cell.v.toString().trim();
+                            // Normalize: remove line breaks, collapse multiple spaces to single space
+                            headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
                         } else {
                             headerText = `Column ${XLSX.utils.encode_col(col)}`;
                         }
@@ -749,8 +1119,8 @@ async function saveBrokerTemplate() {
                 }
             } else if (window.currentPatternAnalysis.autoFooterKeyword) {
                 // Include auto-detected footer even without manual selection
-                parsingConfig.footerRowKeyword = currentPatternAnalysis.autoFooterKeyword;
-                console.log(`Auto footer detection configured: "${currentPatternAnalysis.autoFooterKeyword}"`);
+                parsingConfig.footerRowKeyword = window.currentPatternAnalysis.autoFooterKeyword;
+                console.log(`Auto footer detection configured: "${window.currentPatternAnalysis.autoFooterKeyword}"`);
             }
 
             console.log(`Auto-detected skip rules: skip ${parsingConfig.skipRows} rows, skip ${parsingConfig.skipColumns} columns`);
@@ -767,10 +1137,16 @@ async function saveBrokerTemplate() {
             sourceName: window.currentMappingFile.broker.name,
             filePattern: window.currentMappingFile.name,
             parsingConfig: parsingConfig,
-            columnMapping: { ...currentMapping },
+            columnMapping: { ...window.currentMapping },
             created: new Date().toISOString(),
             lastModified: new Date().toISOString(),
-            version: '1.0'
+            version: '1.0',
+            metadata: {
+                lastUsedFileName: window.currentMappingFile.name,
+                lastUsedFileSize: window.currentMappingFile.file.size,
+                lastEditedDate: new Date().toISOString(),
+                timesUsed: 1
+            }
         };
 
         // Save to unified file mappings store
@@ -785,6 +1161,25 @@ async function saveBrokerTemplate() {
         // Show success message
         alert(`File mapping "${templateName}" saved successfully!\n\nSaved to database and downloaded as JSON file for backup/sharing.`);
 
+        // Save file-mapping context
+        saveFileMappingContext(window.currentMappingFile, fileMapping.id, fileMapping.name);
+
+        // Update the uploaded file's broker information to link it to this template
+        if (window.currentMappingFile) {
+            window.currentMappingFile.broker = {
+                type: 'custom',
+                name: fileMapping.name,
+                templateId: fileMapping.id
+            };
+            window.currentMappingFile.status = 'Template Created';
+            window.currentMappingFile.statusClass = 'status-success';
+        }
+
+        // Update the files display to show the new status
+        if (typeof updateFilesDisplay === 'function') {
+            updateFilesDisplay();
+        }
+
         // Enable the "Process with Template" button now that template is saved
         const processBtn = document.getElementById('process-with-template-btn');
         if (processBtn) {
@@ -796,6 +1191,132 @@ async function saveBrokerTemplate() {
     } catch (error) {
         console.error('Error saving file mapping:', error);
         alert(`Failed to save file mapping: ${error.message}`);
+    }
+}
+
+/**
+ * Update existing broker template
+ */
+async function updateBrokerTemplate() {
+    if (!window.currentMappingFile || Object.keys(window.currentMapping).length === 0) {
+        alert('Please select a file and create at least one mapping before updating.');
+        return;
+    }
+
+    if (!window.fileMappingContext.mappingTemplateId) {
+        alert('No template context found. Please use "Save New Template" instead.');
+        return;
+    }
+
+    try {
+        // Load existing template
+        const allMappings = await window.loadAllFileMappings();
+        const existingTemplate = allMappings.find(t => t.id === window.fileMappingContext.mappingTemplateId);
+
+        if (!existingTemplate) {
+            alert('Template not found. It may have been deleted. Please save as a new template.');
+            clearFileMappingContext();
+            return;
+        }
+
+        const confirmUpdate = confirm(
+            `Update template "${existingTemplate.name}"?\n\n` +
+            `This will overwrite the existing template with your current mappings.\n\n` +
+            `Current mappings: ${Object.keys(window.currentMapping).length} columns`
+        );
+
+        if (!confirmUpdate) return;
+
+        // Create parsing config with auto-detected skip rules
+        const parsingConfig = {
+            dataStartMethod: 'skip-rows',
+            skipRows: 0,
+            skipColumns: 0,
+            headerRow: null
+        };
+
+        // Apply auto-detected skip rules if available
+        if (window.currentPatternAnalysis && window.currentPatternAnalysis.dataSection) {
+            const analysis = window.currentPatternAnalysis.dataSection;
+            parsingConfig.skipRows = analysis.dataStartIndex || 0;
+            parsingConfig.skipColumns = analysis.startColumnIndex || 0;
+            parsingConfig.headerRow = analysis.headerRowIndex;
+
+            // Add enhanced parsingConfig fields for manual selections
+            if (window.currentPatternAnalysis.manualSelection) {
+                const manual = window.currentPatternAnalysis.manualSelection;
+                parsingConfig.headerRows = manual.headerRows;
+                parsingConfig.headerColumns = manual.headerColumns;
+                parsingConfig.headerRange = manual.headerRange;
+
+                // Add footer keyword detection if provided
+                if (manual.footerKeyword) {
+                    parsingConfig.footerRowKeyword = manual.footerKeyword;
+                } else if (window.currentPatternAnalysis.autoFooterKeyword) {
+                    parsingConfig.footerRowKeyword = window.currentPatternAnalysis.autoFooterKeyword;
+                }
+            } else if (window.currentPatternAnalysis.autoFooterKeyword) {
+                // Use auto-detected footer keyword if no manual selection
+                parsingConfig.footerRowKeyword = window.currentPatternAnalysis.autoFooterKeyword;
+            }
+        }
+
+        // Update the template
+        const updatedTemplate = {
+            ...existingTemplate,
+            parsingConfig: parsingConfig,
+            columnMapping: { ...window.currentMapping },
+            lastModified: new Date().toISOString(),
+            metadata: {
+                ...existingTemplate.metadata,
+                lastUsedFileName: window.currentMappingFile.name,
+                lastUsedFileSize: window.currentMappingFile.file.size,
+                lastEditedDate: new Date().toISOString(),
+                timesUsed: (existingTemplate.metadata?.timesUsed || 0) + 1
+            }
+        };
+
+        // Save to unified file mappings store
+        const saved = await window.saveFileMapping(updatedTemplate);
+        if (!saved) {
+            throw new Error('Failed to update template in database');
+        }
+
+        // Also export as JSON file for backup
+        await window.exportFileMappingAsJSON(updatedTemplate, null, appSettings);
+
+        // Show success message
+        alert(`Template "${existingTemplate.name}" updated successfully!\n\nUpdated in database and downloaded as JSON file for backup.`);
+
+        // Update context with new timestamp
+        saveFileMappingContext(window.currentMappingFile, updatedTemplate.id, updatedTemplate.name);
+
+        // Update the uploaded file's broker information
+        if (window.currentMappingFile) {
+            window.currentMappingFile.broker = {
+                type: 'custom',
+                name: updatedTemplate.name,
+                templateId: updatedTemplate.id
+            };
+            window.currentMappingFile.status = 'Template Updated';
+            window.currentMappingFile.statusClass = 'status-success';
+        }
+
+        // Update the files display to show the new status
+        if (typeof updateFilesDisplay === 'function') {
+            updateFilesDisplay();
+        }
+
+        // Refresh keyword management table
+        if (typeof window.loadKeywordManagement === 'function') {
+            await window.loadKeywordManagement();
+        }
+
+        console.log('Template updated:', updatedTemplate);
+
+    } catch (error) {
+        console.error('Error updating template:', error);
+        alert(`Failed to update template: ${error.message}`);
     }
 }
 
@@ -861,116 +1382,6 @@ async function handleBrokerTemplateImport(event) {
     }
 }
 
-
-/**
- * Process file with current template mapping and add to results
- */
-async function processFileWithTemplate() {
-    if (!window.currentMappingFile) {
-        alert('Please select a file to process.');
-        return;
-    }
-
-    if (Object.keys(window.currentMapping).length === 0) {
-        alert('Please create at least one mapping before processing.');
-        return;
-    }
-
-    if (!window.borderellenTemplate || !window.borderellenTemplate.columns) {
-        alert('Please ensure a template is active.');
-        return;
-    }
-
-    try {
-        console.log(`Processing file with custom mapping using orchestrator`);
-
-        // Create parsing config with auto-detected skip rules if available
-        const parsingConfig = {
-            dataStartMethod: 'skip-rows',
-            skipRows: 0,
-            skipColumns: 0,
-            headerRow: null
-        };
-
-        if (window.currentPatternAnalysis && window.currentPatternAnalysis.dataSection) {
-            const analysis = window.currentPatternAnalysis.dataSection;
-            parsingConfig.skipRows = analysis.dataStartIndex || 0;
-            parsingConfig.skipColumns = analysis.startColumnIndex || 0;
-            parsingConfig.headerRow = analysis.headerRowIndex;
-
-            // Include enhanced fields for manual selections
-            if (window.currentPatternAnalysis.manualSelection) {
-                const manual = window.currentPatternAnalysis.manualSelection;
-                parsingConfig.headerRows = manual.headerRows;
-                parsingConfig.headerColumns = manual.headerColumns;
-                parsingConfig.headerRange = manual.headerRange;
-
-                // Add footer keyword detection if provided (manual takes priority)
-                if (manual.footerKeyword) {
-                    parsingConfig.footerRowKeyword = manual.footerKeyword;
-                } else if (window.currentPatternAnalysis.autoFooterKeyword) {
-                    parsingConfig.footerRowKeyword = window.currentPatternAnalysis.autoFooterKeyword;
-                }
-
-                // Configure multi-row data processing if multiple header rows selected
-                if (manual.headerRows > 1) {
-                    parsingConfig.rowProcessing = {
-                        type: 'multi-row',
-                        rowsPerRecord: manual.headerRows
-                    };
-                }
-            } else if (window.currentPatternAnalysis.autoFooterKeyword) {
-                // Include auto-detected footer even without manual selection
-                parsingConfig.footerRowKeyword = currentPatternAnalysis.autoFooterKeyword;
-            }
-
-            console.log(`Applying auto-detected skip rules: skip ${parsingConfig.skipRows} rows, skip ${parsingConfig.skipColumns} columns`);
-        }
-
-        // Use the extended orchestrator with manual mapping override
-        const result = await processBrokerFile({
-            ...currentMappingFile,
-            detectionOverride: {
-                type: 'manual-mapping',
-                mapping: window.currentMapping,
-                parsingConfig: parsingConfig,
-                templateName: 'Custom Template'
-            }
-        });
-
-        if (result.success) {
-            console.log(`Generated ${result.recordCount} processed records`);
-
-            // Update the file with processed results
-            window.currentMappingFile.parsedData = result.data;
-            window.currentMappingFile.recordCount = result.recordCount;
-            window.currentMappingFile.status = 'Processed with Custom Template';
-            window.currentMappingFile.statusClass = 'status-success';
-            window.currentMappingFile.broker = {
-                ...currentMappingFile.broker,
-                type: 'custom-template',
-                name: window.currentMappingFile.broker.name + ' (Custom)'
-            };
-
-            // Update the files display
-            updateFilesDisplay();
-
-            alert(`Successfully processed ${result.recordCount} records using custom template mapping!`);
-
-            // Auto-navigate to Results tab to see the processed data
-            const resultsTab = document.querySelector('[data-tab="results"]');
-            if (resultsTab) {
-                resultsTab.click();
-            }
-        } else {
-            throw new Error(result.error || 'Processing failed');
-        }
-
-    } catch (error) {
-        console.error('Error processing file with template:', error);
-        alert(`Failed to process file: ${error.message}`);
-    }
-}
 
 /**
  * Apply mapping configuration to sample data
@@ -1649,15 +2060,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 attachDropZoneListeners(); // Re-attach listeners after DOM update
 
+                // Try to restore context first
+                setTimeout(async () => {
+                    const contextRestored = await restoreFileMappingContext();
+
+                    // Only auto-select if context wasn't restored
+                    if (!contextRestored) {
+                        autoSelectFileInMappingTab();
+                    }
+                }, 100);
+
                 // Initialize keyword management section
                 if (typeof window.loadKeywordManagement === 'function') {
                     window.loadKeywordManagement();
                 }
-
-                // Auto-select a file with smart prioritization
-                setTimeout(() => {
-                    autoSelectFileInMappingTab();
-                }, 100); // Small delay to ensure DOM is updated
             }
 
             // Initialize results tab when switched to
@@ -1920,6 +2336,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('auto-map-btn').addEventListener('click', generateAutoMappingSuggestions);
     document.getElementById('clear-mapping-btn').addEventListener('click', clearMapping);
     document.getElementById('save-broker-template-btn').addEventListener('click', saveBrokerTemplate);
+    document.getElementById('update-broker-template-btn').addEventListener('click', updateBrokerTemplate);
     document.getElementById('import-broker-template-btn').addEventListener('click', importBrokerTemplate);
     document.getElementById('process-with-template-btn').addEventListener('click', processFileWithTemplate);
 
@@ -2040,7 +2457,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * Process file with existing template - orchestrates the entire processing pipeline
  */
 async function processFileWithTemplate() {
-    if (!window.currentMappingFile || !currentMapping || Object.keys(currentMapping).length === 0) {
+    if (!window.currentMappingFile || !window.currentMapping || Object.keys(window.currentMapping).length === 0) {
         alert('Please load a file and create mappings first');
         return;
     }

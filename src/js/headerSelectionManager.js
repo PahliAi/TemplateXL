@@ -618,8 +618,12 @@ async function applyHeaderSelection() {
     // Close modal
     closeManualHeaderSelection();
 
-    // Reload source columns with new selection using the dedicated manual selection function
-    await loadHeadersFromSelection();
+    // Reload source columns using the main app's loadSourceColumnsFromAnalysis function
+    // This properly handles multi-row headers (no code duplication)
+    const container = document.getElementById('source-columns');
+    if (container) {
+        await loadSourceColumnsFromAnalysis(window.currentMappingFile.file, window.currentPatternAnalysis, container);
+    }
 
     console.log('Applied header selection:', {
         headerRange: window.currentPatternAnalysis.manualSelection.headerRange,
@@ -628,55 +632,8 @@ async function applyHeaderSelection() {
 }
 
 // ========== HEADER LOADING ==========
-
-/**
- * Load headers from manual selection
- */
-async function loadHeadersFromSelection() {
-    try {
-        const workbook = await ExcelCacheManager.getWorkbook(window.currentMappingFile.file);
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const headerRowIndex = window.currentPatternAnalysis.dataSection.headerRowIndex;
-        const minCol = window.currentPatternAnalysis.dataSection.startColumnIndex;
-        const maxCol = window.currentPatternAnalysis.dataSection.endColumnIndex;
-
-        const headers = [];
-        for (let col = minCol; col <= maxCol; col++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: col });
-            const cell = worksheet[cellAddress];
-            if (cell && cell.v) {
-                headers.push(cell.v.toString().trim());
-            } else {
-                headers.push(`Column ${XLSX.utils.encode_col(col)}`);
-            }
-        }
-
-        const container = document.getElementById('source-columns');
-        if (container) {
-            // Build header info in same format as main app
-            const headerRows = window.currentPatternAnalysis.manualSelection.headerRows;
-            const headerRange = window.currentPatternAnalysis.manualSelection.headerRange;
-            const footerKeyword = window.currentPatternAnalysis.manualSelection.footerKeyword;
-
-            let headerInfo = `Header Range: ${headerRange} (${headerRows} rows), Processing: ${headerRows} rows per record, Data starts: ${XLSX.utils.encode_col(minCol)}${headerRowIndex + headerRows}`;
-            if (footerKeyword) {
-                headerInfo += `<br>Footer Keyword: "${footerKeyword}"`;
-            }
-
-            const manualInfo = `
-                <div style="background: #d1ecf1; padding: 12px; margin-bottom: 16px; border-radius: 4px; border-left: 4px solid #17a2b8;">
-                    <strong>Manual Header & Footer Selection</strong><br>
-                    ${headerInfo}
-                </div>
-            `;
-            container.innerHTML = manualInfo;
-            displaySourceColumns(headers);
-        }
-
-    } catch (error) {
-        console.error('Error loading headers from selection:', error);
-    }
-}
+// Note: loadHeadersFromSelection() has been removed to eliminate code duplication.
+// We now use loadSourceColumnsFromAnalysis() from app.js which properly handles multi-row headers.
 
 /**
  * Load headers from manual selection (legacy function for compatibility)
@@ -827,7 +784,6 @@ window.clearRangeSelection = clearRangeSelection;
 window.updateRangeVisual = updateRangeVisual;
 window.updateSelectionStatus = updateSelectionStatus;
 window.applyHeaderSelection = applyHeaderSelection;
-window.loadHeadersFromSelection = loadHeadersFromSelection;
 window.loadHeadersFromManualSelection = loadHeadersFromManualSelection;
 window.displaySourceColumns = displaySourceColumns;
 window.detectFooterKeyword = detectFooterKeyword;

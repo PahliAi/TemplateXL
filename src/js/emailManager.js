@@ -448,8 +448,8 @@ async function validateEmailPlaceholders() {
     for (const broker of window.missingDataAnalysis) {
         const contact = broker.manualContact || await findBrokerContact(broker.brokerName);
 
-        if (!contact && bodyTemplate.includes('{contact_last_name}')) {
-            errors.push(`No contact found for broker "${broker.brokerName}". Contact is needed for {contact_last_name} placeholder.`);
+        if (!contact && (bodyTemplate.includes('{contact_first_name}') || bodyTemplate.includes('{contact_last_name}'))) {
+            errors.push(`No contact found for broker "${broker.brokerName}". Contact is needed for name placeholders.`);
         }
 
         if ((!broker.emailFilename || broker.emailFilename.trim() === '') && bodyTemplate.includes('{filename}')) {
@@ -532,6 +532,7 @@ async function generateSingleEmail(broker, contact, subject, bodyTemplate) {
             contact.email,
             subject,
             bodyTemplate,
+            contact.firstName,
             contact.lastName,
             broker.emailFilename || broker.filename,
             broker.totalRows,
@@ -568,6 +569,7 @@ async function previewEmail(brokerName) {
         contact.email,
         subject,
         bodyTemplate,
+        contact.firstName,
         contact.lastName,
         broker.emailFilename || broker.filename,
         broker.totalRows,
@@ -755,10 +757,11 @@ function confirmFilenameAssignmentProcess() {
 /**
  * Create and download EML file using email template with placeholders
  */
-async function createAndDownloadEMLFileFromTemplate(toEmail, subject, bodyTemplate, contactLastName, filename, totalRows, missingColumns, userSignature) {
+async function createAndDownloadEMLFileFromTemplate(toEmail, subject, bodyTemplate, contactFirstName, contactLastName, filename, totalRows, missingColumns, userSignature) {
     // Process template with placeholders
     const htmlEmailBody = processEmailTemplate(bodyTemplate, {
         contact_email: toEmail,
+        contact_first_name: contactFirstName,
         contact_last_name: contactLastName,
         filename: filename,
         total_rows: totalRows,
@@ -825,18 +828,12 @@ function processEmailTemplate(template, values) {
             // Just insert the email address without special styling
             processedMainContent = processedMainContent.replace(regex, value);
         } else if (placeholder === 'missing_data_table') {
-            // Special handling for missing_data_table - add tip box directly after it
-            const tableWithTip = value + `<!-- Tip Box -->
-<div style="background-color: #e8f4f8; border-left: 4px solid rgb(0, 55, 129); padding: 12px 16px; margin: 8px 0;">
-    <p style="font-family: Arial, sans-serif; font-size: 10pt; color: black; margin: 0; font-weight: bold;">
-        💡 Tip: Een volledig ingevuld borderellen bestand versnelt de verwerking aanzienlijk!
-    </p>
-</div>`;
-            processedMainContent = processedMainContent.replace(regex, tableWithTip);
+            // Insert the missing data table
+            processedMainContent = processedMainContent.replace(regex, value);
         } else {
             // Regular placeholder replacement - all body text should be black
             let styledValue = value;
-            if (placeholder === 'contact_last_name' || placeholder === 'filename') {
+            if (placeholder === 'contact_first_name' || placeholder === 'contact_last_name' || placeholder === 'filename') {
                 styledValue = `<strong style="color: black;">${value}</strong>`;
             } else if (placeholder === 'total_rows') {
                 styledValue = `<strong style="color: black;">${value}</strong>`;
@@ -1081,15 +1078,17 @@ async function resetEmailTemplate() {
         const defaultSubject = 'Ontbrekende data in uw borderellen';
         const defaultBody = `{contact_email}
 
-Geachte heer/mevrouw {contact_last_name},
+Geachte {contact_first_name} {contact_last_name},
 
-Wij hebben uw borderellen bestand {filename} met {total_rows} boekingen in goede orde ontvangen.
-Er ontbreekt echter data, waardoor wij niet in staat zijn deze boekingen snel en accuraat te verwerken.
+Hartelijk dank voor het aanleveren van uw borderel. Deze informatie is erg waardevol voor ons.
 
-Gelieve onderstaande gegevens aan te vullen en aan ons te retourneren.
+Uit onze analyse is gebleken dat u al een groot deel van de benodigde informatie heeft aangeleverd om de boeking op de juiste manier voor u te verwerken. De enige informatie die wij nog nodig hebben om de boeking te kunnen verwerken is:
+
 {missing_data_table}
 
-Bedankt voor uw medewerking.
+Om een soepele en snelle afwikkeling te kunnen garanderen, verzoeken wij u vriendelijk de benodigde gegevens te vermelden in uw borderel volgens bijgevoegd format. Dit stelt ons in staat om de zaak efficiënt te verwerken en vertraging te voorkomen.
+
+Bij voorbaat dank voor uw medewerking. Mocht u nog vragen hebben, dan horen wij dat graag.
 
 Met vriendelijke groet,
 

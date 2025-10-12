@@ -322,11 +322,9 @@ async function getTestDataForFormula() {
         throw new Error('No file loaded. Please select a file from the File Mapping tab first.');
     }
 
-    // Try to get data from current mapping file (already parsed data)
-    if (window.currentMappingFile.parsedData && window.currentMappingFile.parsedData.length > 0) {
-        console.log('Using existing parsedData, length:', window.currentMappingFile.parsedData.length);
-        return window.currentMappingFile.parsedData.slice(0, 5);
-    }
+    // Always re-extract test data using current pattern analysis to ensure fresh, normalized headers
+    // Don't use cached parsedData as it may have outdated column names or non-normalized headers
+    console.log('Re-extracting test data with current pattern analysis for accurate formula testing');
 
     console.log('Reading file for test data:', window.currentMappingFile.file.name);
 

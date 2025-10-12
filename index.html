@@ -230,6 +230,9 @@
 
             <!-- Tab 3: File Mapping -->
             <div class="tab-content" id="mapping-tab">
+                <!-- Context Banner (hidden by default) -->
+                <div id="file-mapping-context-banner" style="display: none;"></div>
+
                 <div class="section">
                     <h2 class="section-title">Interactive File Mapping</h2>
                     <p class="section-subtitle">Create file mappings by dragging columns from uploaded files to Borderellen template fields. Auto-mapping suggestions will be provided.</p>
@@ -269,7 +272,8 @@
 
                 <div class="mapping-buttons-container">
                     <button class="btn" id="auto-map-btn">Auto-Map Suggestions</button>
-                    <button class="btn btn-secondary" id="save-broker-template-btn">Save Broker Template</button>
+                    <button class="btn btn-secondary" id="save-broker-template-btn">Save New Template</button>
+                    <button class="btn btn-secondary" id="update-broker-template-btn" style="display: none;">Update Template</button>
                     <button class="btn btn-secondary" id="import-broker-template-btn">Import Template JSON</button>
                     <button class="btn btn-secondary" id="clear-mapping-btn">Clear Mapping</button>
                     <button class="btn" id="process-with-template-btn">Process with Template</button>

@@ -687,7 +687,13 @@ async function loadKeywordManagement() {
                             <button class="btn btn-secondary"
                                     style="padding: 4px 8px; font-size: 12px;"
                                     onclick="saveTemplateKeyword('${template.id}', '${template.source || 'unknown'}')">
-                                Save
+                                Save Keyword
+                            </button>
+                            <button class="btn btn-secondary edit-mapping-btn"
+                                    style="padding: 4px 8px; font-size: 12px; background-color: #007bff; border-color: #007bff;"
+                                    data-template-id="${template.id || ''}"
+                                    data-template-name="${encodeURIComponent(template.name || 'Unnamed Template')}">
+                                Edit Mapping
                             </button>
                             <button class="btn btn-secondary delete-template-btn"
                                     style="padding: 4px 8px; font-size: 12px; background-color: #d32f2f; border-color: #d32f2f;"
@@ -703,9 +709,27 @@ async function loadKeywordManagement() {
         }).join('');
 
         // Remove any existing event listeners first
-        document.querySelectorAll('.delete-template-btn').forEach(btn => {
+        document.querySelectorAll('.delete-template-btn, .edit-mapping-btn').forEach(btn => {
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
+        });
+
+        // Add fresh event listeners for edit buttons
+        document.querySelectorAll('.edit-mapping-btn').forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                const templateId = this.dataset.templateId;
+                const templateName = decodeURIComponent(this.dataset.templateName || 'Unnamed Template');
+
+                if (!templateId) {
+                    alert('Error: Template ID is missing. Cannot edit.');
+                    return;
+                }
+
+                window.editFileMappingFromTable(templateId, templateName);
+            }, { once: true });
         });
 
         // Add fresh event listeners for delete buttons

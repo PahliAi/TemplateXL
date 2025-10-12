@@ -299,7 +299,8 @@ class GenericBrokerParser {
                         // Clean header text: remove newlines and extra whitespace
                         headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
                     } else {
-                        headerText = `Row${row + 1}_Col${col + 1}`;
+                        // Use Excel column letters (A, B, C...) to match UI display
+                        headerText = `Row${row + 1}_Col${XLSX.utils.encode_col(col)}`;
                     }
 
                     headers.push(headerText);
