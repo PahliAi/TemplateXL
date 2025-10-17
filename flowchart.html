@@ -28,6 +28,39 @@
             padding-bottom: 10px;
             text-align: center;
         }
+        .tab-container {
+            margin: 20px 0;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: none;
+            border-bottom: 3px solid transparent;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: #e9ecef;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 3px solid #00bcd4;
+            color: #00bcd4;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
         .flowchart-container {
             margin: 20px 0;
             text-align: center;
@@ -64,6 +97,19 @@
         .error { background-color: #dc3545; }
         .process { background-color: #007bff; }
         .decision { background-color: #6f42c1; }
+        .code-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #00bcd4;
+        }
+        .step-box {
+            margin: 15px 0;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -71,12 +117,56 @@
         <h1>⚡ Borderellen Converter - Processchema</h1>
 
         <div class="description">
-            <h3>Overzicht van het Verwerkingsproces (v0.51 - Geoptimaliseerde Flow)</h3>
-            <p>Dit schema toont de volledige workflow van het uploaden van borderelbestanden tot het downloaden van gestandaardiseerde data. Het proces gebruikt nu een intelligente 3-flow architectuur met geoptimaliseerde pattern analysis en unified file mapping systeem voor maximale efficiëntie.</p>
+            <h3>Overzicht van het Verwerkingsproces (v0.81 - Met Email & Header Selectie)</h3>
+            <p>Dit schema toont de volledige workflow van het uploaden van borderelbestanden tot het downloaden van gestandaardiseerde data. Het proces gebruikt een intelligente 3-flow architectuur met geoptimaliseerde pattern analysis, handmatige header/footer selectie en email functionaliteit voor ontbrekende data.</p>
         </div>
 
-        <div class="flowchart-container">
-            <div id="flowchart"></div>
+        <div class="tab-container">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('main')">Hoofdproces</button>
+                <button class="tab" onclick="showTab('auto-skip')">Auto-Skip Rules</button>
+                <button class="tab" onclick="showTab('auto-mapping')">Auto-Mapping</button>
+                <button class="tab" onclick="showTab('header-selection')">Header Selectie</button>
+                <button class="tab" onclick="showTab('email-flow')">Email Functie</button>
+            </div>
+
+            <div id="main" class="tab-content active">
+                <div class="flowchart-container">
+                    <div id="flowchart"></div>
+                </div>
+            </div>
+
+            <div id="auto-skip" class="tab-content">
+                <div class="flowchart-container">
+                    <div id="flowchart-autoskip"></div>
+                </div>
+            </div>
+
+            <div id="auto-mapping" class="tab-content">
+                <div class="flowchart-container">
+                    <div id="flowchart-automapping"></div>
+                </div>
+            </div>
+
+            <div id="header-selection" class="tab-content">
+                <div class="description">
+                    <h3>Handmatige Header/Footer Selectie</h3>
+                    <p>Voor complexe Excel bestanden met extra rijen (logo's, samenvattingen) kan de gebruiker handmatig aangeven waar de data begint en eindigt.</p>
+                </div>
+                <div class="flowchart-container">
+                    <div id="flowchart-header"></div>
+                </div>
+            </div>
+
+            <div id="email-flow" class="tab-content">
+                <div class="description">
+                    <h3>Email Functionaliteit met Excel Bijlage</h3>
+                    <p>Wanneer verplichte velden ontbreken in de verwerkte data, kan automatisch een email worden gegenereerd naar de contactpersoon met een Excel bijlage.</p>
+                </div>
+                <div class="flowchart-container">
+                    <div id="flowchart-email"></div>
+                </div>
+            </div>
         </div>
 
         <div class="legend">
@@ -113,17 +203,46 @@
                 <span><strong>Geoptimaliseerd:</strong> Gecachte pattern analysis</span>
             </div>
         </div>
+
+        <div class="description">
+            <h3>Nieuwe Functionaliteiten v0.81</h3>
+            <div class="code-section">
+                <h4>Handmatige Header/Footer Selectie</h4>
+                <p>Voor Excel bestanden met complexe structuren (logo's, meerdere header-rijen, footers) kan de gebruiker handmatig de data-range selecteren. Dit zorgt voor correcte data extractie wanneer automatische detectie niet het gewenste resultaat geeft.</p>
+            </div>
+            <div class="code-section">
+                <h4>Email Functionaliteit met Excel Bijlage</h4>
+                <p>Wanneer verplichte velden ontbreken in de verwerkte data, kan automatisch een email worden gegenereerd naar de contactpersoon met:</p>
+                <ul>
+                    <li>Overzicht van ontbrekende velden per bestand</li>
+                    <li>Excel bijlage met kleurcodering van ontbrekende data</li>
+                    <li>Contactpersonen beheer voor snelle selectie</li>
+                    <li>Automatische download naar voorkeursmap</li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <script>
         mermaid.initialize({
-            startOnLoad: true,
+            startOnLoad: false,
             theme: 'default',
             flowchart: {
                 htmlLabels: true,
                 curve: 'basis'
             }
         });
+
+        function showTab(tabName) {
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
 
         const flowchartDefinition = `
         flowchart TD
@@ -237,9 +356,178 @@
             class SaveUnifiedMapping flow3Class
         `;
 
+        // Header Selection Flow
+        const headerSelectionFlow = `
+        flowchart TD
+            Start([Complex Excel File Uploaded]) --> AutoDetect[🔍 Automatic Pattern Analysis]
+            AutoDetect --> CheckResult{Analysis<br/>Correct?}
+
+            CheckResult -->|Ja| Continue[✅ Continue with Processing]
+            CheckResult -->|Nee| ManualButton[👤 User Clicks<br/>Select Headers/Footers Manually]
+
+            ManualButton --> ShowPreview[📋 Show Excel Preview<br/>with Row Numbers]
+            ShowPreview --> UserSelect[👤 User Selects<br/>Start & End Rows]
+
+            UserSelect --> ValidateRange{Valid<br/>Range?}
+            ValidateRange -->|Nee| ErrorMsg[❌ Show Error Message]
+            ErrorMsg --> UserSelect
+
+            ValidateRange -->|Ja| ApplySelection[🔄 Apply Row Selection]
+            ApplySelection --> UpdateConfig[💾 Update parsingConfig<br/>skipRows & Data Range]
+            UpdateConfig --> ReloadColumns[📊 Reload Source Columns<br/>from Selected Range]
+            ReloadColumns --> ShowMapping[🗺️ Show Column Mapping<br/>with Correct Data]
+            ShowMapping --> ProcessFile[⚙️ Process File<br/>with Custom Range]
+            ProcessFile --> Success([✅ Data Correctly Extracted])
+
+            style Start fill:#e1f5fe
+            style ManualButton fill:#fff3cd,stroke:#ffc107
+            style ShowPreview fill:#d1ecf1,stroke:#17a2b8
+            style ApplySelection fill:#4ecdc4,stroke:#17a2b8
+            style Success fill:#d4edda,stroke:#28a745
+            style ErrorMsg fill:#f8d7da,stroke:#dc3545
+        `;
+
+        // Email Flow
+        const emailFlow = `
+        flowchart TD
+            Start([Data Processed with Missing Fields]) --> CheckMissing{Missing<br/>Required<br/>Fields?}
+
+            CheckMissing -->|Nee| Complete([✅ Process Complete])
+            CheckMissing -->|Ja| ShowButton[📧 Show Generate Email Button]
+
+            ShowButton --> UserClick[👤 User Clicks<br/>Generate Missing Data Email]
+            UserClick --> AnalyzeData[🔍 Analyze Missing Fields<br/>per File]
+
+            AnalyzeData --> ShowModal[📝 Show Email Modal]
+            ShowModal --> ContactChoice{Contact<br/>Selection}
+
+            ContactChoice -->|Select Existing| LoadContact[📋 Load Contact from List]
+            ContactChoice -->|Add New| EnterContact[✏️ Enter Name & Email]
+
+            LoadContact --> ValidateContact{Valid<br/>Contact?}
+            EnterContact --> ValidateContact
+
+            ValidateContact -->|Nee| ErrorMsg[❌ Show Error]
+            ErrorMsg --> ShowModal
+
+            ValidateContact -->|Ja| GenerateEmail[📧 Generate Email Body<br/>with Missing Fields List]
+            GenerateEmail --> CreateExcel[📊 Create Excel Attachment<br/>with Color Coding]
+
+            CreateExcel --> DownloadExcel[⬇️ Download Excel File<br/>to Preferred Folder]
+            DownloadExcel --> OpenMailto[📬 Open mailto: Link<br/>with Pre-filled Content]
+
+            OpenMailto --> UserSend[👤 User Sends Email<br/>from Email Client]
+            UserSend --> SaveContact{Save<br/>Contact?}
+
+            SaveContact -->|Ja| StoreContact[💾 Save to brokerContacts]
+            SaveContact -->|Nee| Done([✅ Email Ready to Send])
+            StoreContact --> Done
+
+            style Start fill:#e1f5fe
+            style ShowButton fill:#fff3cd,stroke:#ffc107
+            style AnalyzeData fill:#d1ecf1,stroke:#17a2b8
+            style CreateExcel fill:#4ecdc4,stroke:#17a2b8
+            style OpenMailto fill:#90ee90,stroke:#28a745
+            style Done fill:#d4edda,stroke:#28a745
+            style ErrorMsg fill:#f8d7da,stroke:#dc3545
+        `;
+
+        // Auto-Skip Flow from auto-skip-flowchart.html
+        const autoSkipFlow = `
+        flowchart TD
+            A["User Uploads File"] --> B{"File Type?"}
+            B -->|Excel| C["addFileToTable()"]
+            B -->|PDF| D["Mark as PDF - Manual Required"]
+            C --> E["detectBrokerType(filename)<br/>🔍 Smart 3-Path Detection"]
+            E --> F1{Built-in<br/>Parser?}
+            E --> F2{Keyword<br/>Match?}
+            E --> F3{Unknown<br/>Format?}
+            F1 -->|Yes| G1["🟢 FLOW 1: Built-in Parser<br/>AON/VGA/BCI/Voogt<br/>✅ No Analysis Needed"]
+            F2 -->|Yes| G2["🟡 FLOW 2: Keyword-Matched Custom<br/>📋 Load Unified File Mapping<br/>⚡ Auto-apply with parsingConfig"]
+            F3 -->|Yes| G3["🔴 FLOW 3: Unknown Format<br/>🔍 OPTIMIZED: Run Pattern Analysis ONCE<br/>💾 Cache in fileData.patternAnalysis"]
+            G1 --> N1["Direct Processing with Built-in Logic"]
+            G2 --> N2["processBrokerFile() with custom type<br/>✅ Uses saved parsingConfig + columnMapping"]
+            G3 --> H3["Cache Analysis Results<br/>🎯 Available for ALL functions"]
+            H3 --> I3["Show Template Options"]
+            N1 --> MM3["Update File Status & Navigate to Results"]
+            N2 --> MM3
+
+            style F1 fill:#90ee90,stroke:#28a745
+            style G1 fill:#90ee90,stroke:#28a745
+            style F2 fill:#ffa500,stroke:#ff8c00
+            style G2 fill:#ffa500,stroke:#ff8c00
+            style F3 fill:#ff6b6b,stroke:#dc3545
+            style G3 fill:#ff6b6b,stroke:#dc3545
+            style H3 fill:#4ecdc4,stroke:#17a2b8
+        `;
+
+        // Auto-Mapping Flow from mapping_flowchart.html
+        const autoMappingFlow = `
+        flowchart TD
+            A["User clicks Auto Map button"] --> B["app.js: generateAutoMapping()"]
+            B --> C["Get sourceColumnNames from Excel"]
+            B --> D["Get templateColumns from borderellenTemplate"]
+            C --> E["AutoMapping.generateMappingSuggestions()"]
+            D --> E
+            E --> F["Build N×M Confidence Matrix"]
+            F --> G["For each source × template pair"]
+            G --> H["AutoMapping.calculateColumnMatchConfidence()"]
+            H --> I["normalizeString on both names"]
+            I --> J{"Are normalized strings identical?"}
+            J -->|Yes| K["Return 100.0 - EXACT MATCH"]
+            J -->|No| L["Calculate fuzzy scores"]
+            L --> M["Character Similarity: Levenshtein × 50"]
+            M --> N["Substring Coverage: coverage × 30"]
+            N --> O["Word Overlap: overlap × 20"]
+            O --> P["Length Penalty: diff × 0.5"]
+            P --> Q["Sum scores, cap at 99 max"]
+            Q --> R["Store in confidenceMatrix[i][j]"]
+            R --> S{"More pairs to calculate?"}
+            S -->|Yes| G
+            S -->|No| T["performOptimalAssignment()"]
+            T --> U["Flatten matrix to allPairs array"]
+            U --> V["Sort by confidence DESC"]
+            V --> W["Greedy assignment loop"]
+            W --> X["Take highest unused pair"]
+            X --> Y{"Source and Template both unused?"}
+            Y -->|Yes| Z["Assign pair, mark as used"]
+            Y -->|No| AA["Skip pair"]
+            Z --> BB{"More pairs available?"}
+            AA --> BB
+            BB -->|Yes| X
+            BB -->|No| CC["Filter by threshold >= 30%"]
+            CC --> DD["Return final mapping object"]
+            DD --> EE["Update UI with results"]
+
+            style K fill:#4caf50,color:#fff
+            style Q fill:#ff9800,color:#fff
+            style DD fill:#2196f3,color:#fff
+        `;
+
+        // Render all flowcharts
         const element = document.getElementById('flowchart');
         mermaid.render('flowchart-svg', flowchartDefinition).then(result => {
             element.innerHTML = result.svg;
+        });
+
+        const elementAutoSkip = document.getElementById('flowchart-autoskip');
+        mermaid.render('flowchart-autoskip-svg', autoSkipFlow).then(result => {
+            elementAutoSkip.innerHTML = result.svg;
+        });
+
+        const elementAutoMapping = document.getElementById('flowchart-automapping');
+        mermaid.render('flowchart-automapping-svg', autoMappingFlow).then(result => {
+            elementAutoMapping.innerHTML = result.svg;
+        });
+
+        const elementHeader = document.getElementById('flowchart-header');
+        mermaid.render('flowchart-header-svg', headerSelectionFlow).then(result => {
+            elementHeader.innerHTML = result.svg;
+        });
+
+        const elementEmail = document.getElementById('flowchart-email');
+        mermaid.render('flowchart-email-svg', emailFlow).then(result => {
+            elementEmail.innerHTML = result.svg;
         });
     </script>
 </body>

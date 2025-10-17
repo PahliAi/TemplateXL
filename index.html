@@ -8,6 +8,9 @@
     <!-- SheetJS Library -->
     <script src="src/lib/xlsx.full.min.js"></script>
 
+    <!-- ExcelJS Library for styling support -->
+    <script src="src/vendor/exceljs.min.js"></script>
+
     <!-- CSS Stylesheets -->
     <link rel="stylesheet" href="src/css/main.css">
     <link rel="stylesheet" href="src/css/components.css">
@@ -488,7 +491,7 @@ Met vriendelijke groet,
                             <p id="contact-matching-message"></p>
                             <div class="form-group">
                                 <label class="form-label">Select Contact</label>
-                                <select class="form-input" id="broker-contact-selector">
+                                <select class="form-input" id="broker-contact-selector" title="Select Contact">
                                     <option value="">Choose a contact...</option>
                                 </select>
                             </div>

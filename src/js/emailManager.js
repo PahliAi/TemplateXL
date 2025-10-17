@@ -315,6 +315,9 @@ async function analyzeMissingData(filesData) {
 
             analysis.overallCompletionRate = (totalFilledFields / totalRequiredFields) * 100;
 
+            // Store broker rows for Excel generation
+            analysis.rows = brokerData.rows;
+
             // Only include brokers that have missing data
             if (analysis.overallCompletionRate < 100) {
                 window.missingDataAnalysis.push(analysis);
@@ -519,7 +522,7 @@ async function generateAllEmails() {
         }
     }
 
-    alert(`Generated ${emailsGenerated} email(s). Check your email client.`);
+    // Alert removed - user already sees downloads
 }
 
 /**
@@ -527,7 +530,19 @@ async function generateAllEmails() {
  */
 async function generateSingleEmail(broker, contact, subject, bodyTemplate) {
     try {
-        // Use template system for all email generation (including table)
+        // Extract broker data for Excel
+        const brokerData = getBrokerDataForExcel(broker);
+
+        if (brokerData.length === 0) {
+            console.error('No data available for broker:', broker.brokerName);
+            alert(`Cannot generate email for ${broker.brokerName}: No data available`);
+            return;
+        }
+
+        // Create Excel attachment
+        const excelBlob = await createExcelAttachmentForBroker(broker, brokerData);
+
+        // Generate and download EML with Excel attachment
         await createAndDownloadEMLFileFromTemplate(
             contact.email,
             subject,
@@ -536,8 +551,9 @@ async function generateSingleEmail(broker, contact, subject, bodyTemplate) {
             contact.lastName,
             broker.emailFilename || broker.filename,
             broker.totalRows,
-            broker.missingColumns, // Pass all required columns, not just incomplete ones
-            window.appSettings.userSignature || window.appSettings.userName || 'User'
+            null, // No longer passing missingColumns (table removed from email)
+            window.appSettings.userSignature || window.appSettings.userName || 'User',
+            excelBlob // Pass Excel attachment
         );
 
         // Small delay between emails to avoid overwhelming the system
@@ -545,6 +561,7 @@ async function generateSingleEmail(broker, contact, subject, bodyTemplate) {
 
     } catch (error) {
         console.error('Error generating email for broker:', broker.brokerName, error);
+        alert(`Error generating email for ${broker.brokerName}: ${error.message}`);
     }
 }
 
@@ -564,18 +581,36 @@ async function previewEmail(brokerName) {
     const subject = document.getElementById('email-subject').value;
     const bodyTemplate = document.getElementById('email-body-template').value;
 
-    // Use template system for email preview
-    await createAndDownloadEMLFileFromTemplate(
-        contact.email,
-        subject,
-        bodyTemplate,
-        contact.firstName,
-        contact.lastName,
-        broker.emailFilename || broker.filename,
-        broker.totalRows,
-        broker.missingColumns, // Show ALL required columns, not just incomplete ones
-        window.appSettings.userSignature || window.appSettings.userName || 'User'
-    );
+    try {
+        // Extract broker data for Excel
+        const brokerData = getBrokerDataForExcel(broker);
+
+        if (brokerData.length === 0) {
+            console.error('No data available for broker:', broker.brokerName);
+            alert(`Cannot preview email for ${broker.brokerName}: No data available`);
+            return;
+        }
+
+        // Create Excel attachment
+        const excelBlob = await createExcelAttachmentForBroker(broker, brokerData);
+
+        // Generate preview with Excel attachment
+        await createAndDownloadEMLFileFromTemplate(
+            contact.email,
+            subject,
+            bodyTemplate,
+            contact.firstName,
+            contact.lastName,
+            broker.emailFilename || broker.filename,
+            broker.totalRows,
+            null, // No longer passing missingColumns (table removed from email)
+            window.appSettings.userSignature || window.appSettings.userName || 'User',
+            excelBlob // Pass Excel attachment
+        );
+    } catch (error) {
+        console.error('Error previewing email for broker:', broker.brokerName, error);
+        alert(`Error previewing email for ${broker.brokerName}: ${error.message}`);
+    }
 }
 
 // ========== CONTACT MATCHING ==========
@@ -752,12 +787,129 @@ function confirmFilenameAssignmentProcess() {
     }
 }
 
+// ========== EXCEL GENERATION ==========
+
+/**
+ * Extract broker data for Excel attachment
+ * @param {Object} broker - Broker analysis object from missingDataAnalysis
+ * @returns {Array} Array of row objects with all 22 columns
+ */
+function getBrokerDataForExcel(broker) {
+    if (!broker.rows || broker.rows.length === 0) {
+        console.warn('No rows found for broker:', broker.brokerName);
+        return [];
+    }
+
+    const templateColumns = window.borderellenTemplate?.columns || [];
+    if (templateColumns.length === 0) {
+        console.error('No template columns defined');
+        return [];
+    }
+
+    // Ensure all rows have all 22 columns
+    return broker.rows.map(row => {
+        const completeRow = {};
+        templateColumns.forEach(col => {
+            completeRow[col.name] = row[col.name] !== undefined ? row[col.name] : '';
+        });
+        return completeRow;
+    });
+}
+
+/**
+ * Create Excel attachment for broker with highlighted missing fields
+ * @param {Object} broker - Broker analysis object
+ * @param {Array} brokerData - Complete data rows for this broker
+ * @returns {Promise<Blob>} Excel file as blob
+ */
+async function createExcelAttachmentForBroker(broker, brokerData) {
+    try {
+        const templateColumns = window.borderellenTemplate?.columns || [];
+        const requiredColumns = templateColumns.filter(col => col.required);
+
+        // Create workbook using ExcelJS
+        const workbook = new ExcelJS.Workbook();
+
+        // Add Data sheet (instructions removed as they're in the email)
+        const dataSheet = workbook.addWorksheet('Data - ' + broker.brokerName.substring(0, 20));
+
+        // Set up columns with headers
+        dataSheet.columns = templateColumns.map(col => ({
+            header: col.name,
+            key: col.name,
+            width: 15 // Will auto-size later
+        }));
+
+        // Add data rows
+        brokerData.forEach(row => {
+            dataSheet.addRow(row);
+        });
+
+        // Auto-size columns based on content
+        dataSheet.columns.forEach((column, colIndex) => {
+            let maxLength = column.header.length;
+            column.eachCell({ includeEmpty: false }, cell => {
+                const cellValue = cell.value ? String(cell.value) : '';
+                maxLength = Math.max(maxLength, cellValue.length);
+            });
+            column.width = Math.min(maxLength + 2, 50);
+        });
+
+        // Apply yellow highlighting to required columns (entire column)
+        templateColumns.forEach((col, colIndex) => {
+            const isRequired = requiredColumns.find(req => req.name === col.name);
+
+            if (isRequired) {
+                const column = dataSheet.getColumn(colIndex + 1);
+                column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFFF3CD' } // Light yellow
+                    };
+                });
+            }
+        });
+
+        // Freeze header row
+        dataSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+
+        // Generate Excel buffer
+        const buffer = await workbook.xlsx.writeBuffer();
+
+        return new Blob([buffer], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+
+    } catch (error) {
+        console.error('Error creating Excel attachment:', error);
+        throw error;
+    }
+}
+
+/**
+ * Convert blob to base64 string
+ * @param {Blob} blob - Blob to convert
+ * @returns {Promise<string>} Base64 encoded string
+ */
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result.split(',')[1];
+            resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
 // ========== EMAIL CREATION ==========
 
 /**
  * Create and download EML file using email template with placeholders
  */
-async function createAndDownloadEMLFileFromTemplate(toEmail, subject, bodyTemplate, contactFirstName, contactLastName, filename, totalRows, missingColumns, userSignature) {
+async function createAndDownloadEMLFileFromTemplate(toEmail, subject, bodyTemplate, contactFirstName, contactLastName, filename, totalRows, missingColumns, userSignature, excelAttachment = null) {
     // Process template with placeholders
     const htmlEmailBody = processEmailTemplate(bodyTemplate, {
         contact_email: toEmail,
@@ -765,12 +917,49 @@ async function createAndDownloadEMLFileFromTemplate(toEmail, subject, bodyTempla
         contact_last_name: contactLastName,
         filename: filename,
         total_rows: totalRows,
-        missing_data_table: createMissingDataTableHTML(missingColumns),
+        missing_data_table: missingColumns ? createMissingDataTableHTML(missingColumns) : '',
         user_signature: userSignature
     });
 
-    // Create EML file content with proper headers
-    const emlContent = `To: ${toEmail}
+    // Generate filename based on broker name with date and time
+    const brokerName = filename.split(/[._]/)[0] || 'Email';
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/[:.]/g, '-');
+    const emlFilename = `${brokerName}_OntbrekendeData_${timestamp}.eml`;
+
+    let emlContent;
+
+    if (excelAttachment) {
+        // MIME multipart structure with attachment
+        const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+        const base64Excel = await blobToBase64(excelAttachment);
+        const attachmentFilename = `${brokerName}_Borderel_ToComplete_${timestamp}.xlsx`;
+
+        emlContent = `To: ${toEmail}
+From: ${window.appSettings.userEmail || 'noreply@borderellenconverter.nl'}
+Subject: ${subject}
+Date: ${new Date().toUTCString()}
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="${boundary}"
+
+--${boundary}
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+${htmlEmailBody}
+
+--${boundary}
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="${attachmentFilename}"
+
+${base64Excel}
+
+--${boundary}--`;
+
+    } else {
+        // Simple single-part email (backward compatible)
+        emlContent = `To: ${toEmail}
 From: ${window.appSettings.userEmail || 'noreply@borderellenconverter.nl'}
 Subject: ${subject}
 Date: ${new Date().toUTCString()}
@@ -779,12 +968,7 @@ Content-Type: text/html; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
 ${htmlEmailBody}`;
-
-    // Generate filename based on broker name with date and time
-    const brokerName = filename.split(/[._]/)[0] || 'Email';
-    const now = new Date();
-    const timestamp = now.toISOString().slice(0, 19).replace(/[:.]/g, '-');
-    const emlFilename = `${brokerName}_OntbrekendeData_${timestamp}.eml`;
+    }
 
     // Create blob and download EML file
     const blob = new Blob([emlContent], { type: 'message/rfc822' });
@@ -793,7 +977,7 @@ ${htmlEmailBody}`;
     const success = await window.downloadToPreferredFolder(blob, emlFilename, 'message/rfc822');
 
     if (success) {
-        console.log(`EML file created: ${emlFilename}. Please open manually from your downloads folder.`);
+        console.log(`EML file created: ${emlFilename}${excelAttachment ? ' with Excel attachment' : ''}. Please open manually from your downloads folder.`);
     }
 }
 
@@ -831,30 +1015,23 @@ function processEmailTemplate(template, values) {
             // Insert the missing data table
             processedMainContent = processedMainContent.replace(regex, value);
         } else {
-            // Regular placeholder replacement - all body text should be black
-            let styledValue = value;
-            if (placeholder === 'contact_first_name' || placeholder === 'contact_last_name' || placeholder === 'filename') {
-                styledValue = `<strong style="color: black;">${value}</strong>`;
-            } else if (placeholder === 'total_rows') {
-                styledValue = `<strong style="color: black;">${value}</strong>`;
-            }
-            processedMainContent = processedMainContent.replace(regex, styledValue);
+            // Regular placeholder replacement
+            processedMainContent = processedMainContent.replace(regex, value);
         }
     });
 
-    // Process signature separately and keep it as-is (Allianz blue)
+    // Process signature separately (Allianz blue)
     let processedSignature = '';
     if (signatureTemplate.includes('{user_signature}')) {
-        processedSignature = signatureTemplate.replace(/{user_signature}/g, createHTMLSignature(values.user_signature));
+        processedSignature = createHTMLSignature(values.user_signature);
     }
 
-    // Wrap main content in paragraphs, but preserve signature HTML structure
-    const wrappedMainContent = processedMainContent.split('\n').map(line =>
-        line.trim() ? `<p style="font-family: Arial, sans-serif; font-size: 10pt; color: black; margin: 0 0 4px 0;">${line.trim()}</p>` : '<br>'
-    ).join('');
+    // Convert newlines to <br> and wrap in simple div
+    const htmlContent = processedMainContent.replace(/\n/g, '<br>');
 
-    return `<div style="font-family: Arial, sans-serif; font-size: 10pt; color: black; line-height: 1.6; max-width: 600px;">
-${wrappedMainContent}${processedSignature}
+    return `<div style="font-family: Arial, sans-serif; font-size: 10pt; color: black;">
+${htmlContent}
+${processedSignature}
 </div>`;
 }
 
@@ -938,46 +1115,12 @@ function createMissingDataTableHTML(allRequiredColumns) {
  * Create HTML signature with Allianz branding
  */
 function createHTMLSignature(userSignature) {
-    // Parse signature for structured information
-    const signatureLines = userSignature.split('\n').filter(line => line.trim());
+    // Simply convert newlines to <br> and apply Allianz blue color
+    const signatureHTML = userSignature.replace(/\n/g, '<br>');
 
-    if (signatureLines.length === 0) {
-        return `<p style="font-family: Arial, sans-serif; font-size: 10pt; color: rgb(0, 55, 129);">${userSignature}</p>`;
-    }
-
-    // Try to detect if signature has structured format (Name, Function, Company details)
-    const hasStructuredFormat = signatureLines.length >= 2;
-
-    if (hasStructuredFormat && signatureLines.length >= 3) {
-        // Structured signature: Name, Function, Company details
-        const [name, functionTitle, ...companyDetails] = signatureLines;
-
-        return `
-<div style="font-family: Arial, sans-serif; font-size: 10pt; margin-top: 4px;">
-    <div style="color: rgb(0, 55, 129); font-weight: bold; font-size: 10pt; margin-bottom: 2px;">
-        ${name}
-    </div>
-    <div style="color: rgb(0, 55, 129); font-size: 10pt; margin-bottom: 2px;">
-        ${functionTitle}
-    </div>
-    <div style="color: rgb(0, 55, 129); font-size: 10pt; margin-bottom: 10px;">
-        ${companyDetails.join('<br>')}
-    </div>
-    ${createSocialMediaLinks()}
+    return `<br><div style="font-family: Arial, sans-serif; font-size: 10pt; color: rgb(0, 55, 129);">
+${signatureHTML}
 </div>`;
-    } else {
-        // Simple signature - ALWAYS Allianz blue (NEVER black)
-        return `
-<div style="font-family: Arial, sans-serif; font-size: 10pt; margin-top: 4px;">
-    <div style="color: rgb(0, 55, 129); font-weight: bold; font-size: 10pt; margin-bottom: 10px;">
-        ${signatureLines[0]}
-    </div>
-    ${signatureLines.slice(1).map(line =>
-        `<div style="color: rgb(0, 55, 129); font-size: 10pt; margin-bottom: 2px;">${line}</div>`
-    ).join('')}
-    ${createSocialMediaLinks()}
-</div>`;
-    }
 }
 
 /**
@@ -1082,12 +1225,14 @@ Geachte {contact_first_name} {contact_last_name},
 
 Hartelijk dank voor het aanleveren van uw borderel. Deze informatie is erg waardevol voor ons.
 
-Uit onze analyse is gebleken dat u al een groot deel van de benodigde informatie heeft aangeleverd om de boeking op de juiste manier voor u te verwerken. De enige informatie die wij nog nodig hebben om de boeking te kunnen verwerken is:
+Uit onze analyse is gebleken dat er nog enkele velden ontbreken om de boeking correct te kunnen verwerken.
+Om het invullen voor u te vereenvoudigen, hebben wij een Excel bestand bijgevoegd met daarin:
+   - Alle gegevens die u reeds heeft aangeleverd
+   - De ontbrekende verplichte velden gemarkeerd in het geel
 
-{missing_data_table}
+U hoeft alleen de gele velden in te vullen en het bestand aan ons terug te sturen.
 
-Om een soepele en snelle afwikkeling te kunnen garanderen, verzoeken wij u vriendelijk de benodigde gegevens te vermelden in uw borderel volgens bijgevoegd format. Dit stelt ons in staat om de zaak efficiënt te verwerken en vertraging te voorkomen.
-
+Om een soepele en snelle afwikkeling te kunnen garanderen, verzoeken wij u vriendelijk het ingevulde bestand binnen 5 werkdagen te retourneren.
 Bij voorbaat dank voor uw medewerking. Mocht u nog vragen hebben, dan horen wij dat graag.
 
 Met vriendelijke groet,
