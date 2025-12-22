@@ -115,6 +115,12 @@ async function loadHeaderSelectionGrid() {
     try {
         const workbook = await ExcelCacheManager.getWorkbook(window.currentMappingFile.file);
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        // Check if worksheet has valid range
+        if (!worksheet || !worksheet['!ref']) {
+            throw new Error(`Worksheet has no valid range. The file may be corrupted or empty.`);
+        }
+
         const range = XLSX.utils.decode_range(worksheet['!ref']);
 
         // Show grid (rows 1-30, all available columns)

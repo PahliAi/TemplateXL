@@ -10,6 +10,21 @@ class DataPatternAnalyzer {
      * @returns {Object} Analysis results with suggestions
      */
     static analyzeSheet(worksheet) {
+        // Check if worksheet has valid range
+        if (!worksheet || !worksheet['!ref']) {
+            console.error('Worksheet has no valid range (!ref is missing)');
+            return {
+                dataSection: { start: 0, end: 0, confidence: 0 },
+                suggestedHeaderRow: 0,
+                suggestedDataStart: 0,
+                suggestedDataEnd: 0,
+                confidence: 0,
+                headerAnalysis: { headers: [], quality: 0 },
+                qualityAnalysis: { overallQuality: 0 },
+                suggestions: ['Cannot analyze worksheet - no valid range found']
+            };
+        }
+
         const range = XLSX.utils.decode_range(worksheet['!ref']);
         console.log(`Analyzing sheet with range: ${worksheet['!ref']}`);
 
@@ -49,11 +64,12 @@ class DataPatternAnalyzer {
         try {
             // Use centralized cache to ensure same compacted state as execution
             const workbook = await ExcelCacheManager.getWorkbook(file);
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
             const analysis = this.analyzeSheet(worksheet);
 
             analysis.filename = file.name;
-            analysis.sheetName = workbook.SheetNames[0];
+            analysis.sheetName = sheetName;
             analysis.analyzedAt = new Date().toISOString();
 
             return analysis;

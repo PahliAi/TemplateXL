@@ -135,14 +135,15 @@ async function updateProcessButtonState() {
             const detection = await window.detectBrokerType(window.currentMappingFile.file.name);
             console.log('Template detection result:', detection);
 
-            if (detection && detection.type === 'custom' && detection.template) {
-                // Template exists - enable button
-                console.log('Template found, enabling button:', detection.template.name);
+            if (detection && (detection.type === 'built-in' || (detection.type === 'custom' && detection.template))) {
+                // Built-in parser or custom template exists - enable button
+                const templateName = detection.type === 'built-in' ? detection.name : detection.template.name;
+                console.log('Parser/template found, enabling button:', templateName);
                 processBtn.disabled = false;
-                processBtn.textContent = `Process with Template (${detection.template.name})`;
+                processBtn.textContent = `Process with ${detection.type === 'built-in' ? 'Parser' : 'Template'} (${templateName})`;
             } else {
-                // No template found - disable button
-                console.log('No template found, disabling button');
+                // No parser or template found - disable button
+                console.log('No parser/template found, disabling button');
                 processBtn.disabled = true;
                 processBtn.textContent = 'Save Template First';
             }

@@ -64,16 +64,80 @@ async function addFileToTable(file) {
     let parsedData = [];
     let brokerInfo = null;
     let patternAnalysis = null;
+    let sheetSelection = null; // [NEW] Declare at function scope
+    let workbook = null; // [NEW] Declare at function scope
 
     if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.name.endsWith('.xlsx')) {
+        file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
         try {
+            // [NEW] Load workbook and check for multiple sheets
+            workbook = await ExcelCacheManager.getWorkbook(file);
+
+            console.log(`[DEBUG] File ${file.name} loaded with ${workbook.SheetNames.length} sheets:`, workbook.SheetNames);
+
+            // [NEW] If multiple sheets, prompt user to select
+            if (workbook.SheetNames.length > 1) {
+                console.log(`[DEBUG] Showing sheet selector for ${file.name}...`);
+
+                // Check if SheetSelectorManager is available
+                if (typeof SheetSelectorManager === 'undefined') {
+                    console.error('[DEBUG] SheetSelectorManager is not loaded!');
+                    sheetSelection = { sheetName: workbook.SheetNames[0], pattern: null };
+                } else {
+                    console.log('[DEBUG] SheetSelectorManager is available');
+                    try {
+                        sheetSelection = await SheetSelectorManager.selectSheet(workbook.SheetNames, file.name);
+                        console.log('[DEBUG] User selected sheet:', sheetSelection);
+                    } catch (error) {
+                        console.error('[DEBUG] Sheet selection error:', error);
+                        console.log('[DEBUG] Sheet selection cancelled, using first sheet');
+                        sheetSelection = { sheetName: workbook.SheetNames[0], pattern: null };
+                    }
+                }
+            } else {
+                console.log(`[DEBUG] Only 1 sheet, no selector needed`);
+            }
+
+            // [NEW] Apply sheet selection by deleting all other sheets
+            if (sheetSelection) {
+                let selectedSheetName = null;
+
+                if (sheetSelection.sheetName) {
+                    selectedSheetName = sheetSelection.sheetName;
+                } else if (sheetSelection.pattern) {
+                    selectedSheetName = SheetSelectorManager.findSheetByPattern(workbook.SheetNames, sheetSelection.pattern);
+                }
+
+                if (selectedSheetName && workbook.Sheets[selectedSheetName]) {
+                    console.log(`Selected sheet: ${selectedSheetName}, removing all other sheets...`);
+
+                    // Keep only the selected sheet
+                    const selectedSheet = workbook.Sheets[selectedSheetName];
+
+                    // Delete all other sheets
+                    for (const sheetName of workbook.SheetNames) {
+                        if (sheetName !== selectedSheetName) {
+                            delete workbook.Sheets[sheetName];
+                        }
+                    }
+
+                    // Update SheetNames array to contain only the selected sheet
+                    workbook.SheetNames = [selectedSheetName];
+
+                    console.log(`Workbook now contains only sheet: ${selectedSheetName}`);
+                }
+            }
+
             // FLOW 1: First check if this is a built-in parser (no analysis needed)
             const detection = await detectBrokerType(file.name);
             console.log('Initial detection for', file.name, ':', detection);
 
             let patternAnalysis = null;
-            let tempFileData = { file: file, name: file.name };
+            let tempFileData = {
+                file: file,
+                name: file.name,
+                sheetSelection: sheetSelection  // [NEW] Pass sheet selection
+            };
 
             if (detection.type === 'built-in') {
                 console.log('FLOW 1: Using built-in parser:', detection.parser);
@@ -160,14 +224,17 @@ async function addFileToTable(file) {
         recordCount: recordCount,
         parsedData: parsedData, // Store the parsed data
         selectedTemplateId: null, // Will be set if template was auto-applied
-        patternAnalysis: null // Will store the analysis result for reuse
+        patternAnalysis: null, // Will store the analysis result for reuse
+        sheetSelection: null // [NEW] Store sheet selection for this file
     };
 
-    // Store pattern analysis for reuse if Excel file was processed
+    // Store pattern analysis and sheet selection for reuse if Excel file was processed
     if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.name.endsWith('.xlsx')) {
+        file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
         // Pattern analysis was computed above, store it in fileData
         fileData.patternAnalysis = patternAnalysis;
+        // [NEW] Store sheet selection
+        fileData.sheetSelection = sheetSelection;
     }
 
     // Template associations are now handled via keyword matching in detectBrokerType
@@ -208,6 +275,7 @@ function updateFilesDisplay() {
             <td>
                 <span class="status-indicator ${fileData.statusClass}"></span>
                 ${fileData.status}
+                ${fileData.sheetSelection ? `<br><small style="color: #666;">Sheet: ${fileData.sheetSelection.sheetName || 'Pattern matched'}</small>` : ''}
             </td>
             <td>${fileData.recordCount}</td>
             <td>

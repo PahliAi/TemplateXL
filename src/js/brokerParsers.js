@@ -522,6 +522,63 @@ async function processBrokerFile(fileData) {
                 // Handle custom templates from unified file mapping system
                 const template = detection.template;
 
+                // [NEW] Determine which sheet to use based on template configuration
+                let sheetSelector = null;
+                let sheetName = workbook.SheetNames[0]; // Default to first sheet
+
+                if (template.sheetSelection) {
+                    console.log('Template has sheet selection config:', template.sheetSelection);
+                    if (template.sheetSelection.type === 'pattern') {
+                        sheetSelector = { pattern: template.sheetSelection.pattern };
+                        // Find matching sheet
+                        const matchedSheet = SheetSelectorManager.findSheetByPattern(
+                            workbook.SheetNames,
+                            template.sheetSelection.pattern
+                        );
+                        if (matchedSheet) {
+                            sheetName = matchedSheet;
+                            console.log(`Sheet matched by pattern: ${sheetName}`);
+                        } else {
+                            console.warn(`No sheet matched pattern ${template.sheetSelection.pattern}, using first sheet`);
+                        }
+                    } else if (template.sheetSelection.type === 'name') {
+                        sheetName = template.sheetSelection.sheetName;
+                        if (!workbook.Sheets[sheetName]) {
+                            console.warn(`Sheet "${sheetName}" not found, using first sheet`);
+                            sheetName = workbook.SheetNames[0];
+                        }
+                    }
+                }
+
+                // [NEW] Apply worksheet cleanup if cleanupRules exist (generic parser only)
+                let cleanedWorkbook = workbook;
+                if (template.cleanupRules?.preprocessRules) {
+                    console.log(`Applying worksheet cleanup for custom template on sheet "${sheetName}"...`);
+                    const originalSheet = workbook.Sheets[sheetName];
+                    const cleanedSheet = WorksheetCleaner.cleanWorksheet(
+                        originalSheet,
+                        template.cleanupRules.preprocessRules
+                    );
+
+                    // Create new workbook with cleaned sheet
+                    cleanedWorkbook = {
+                        SheetNames: workbook.SheetNames,
+                        Sheets: {
+                            ...workbook.Sheets,
+                            [sheetName]: cleanedSheet
+                        }
+                    };
+
+                    const stats = WorksheetCleaner.getCleanupStats(originalSheet, cleanedSheet);
+                    console.log('Worksheet cleanup stats:', stats);
+                }
+
+                // Store selected sheet name for parser to use
+                const selectedWorkbook = {
+                    ...cleanedWorkbook,
+                    _selectedSheet: sheetName
+                };
+
                 if (template.parsingConfig && template.columnMapping) {
                     // Use two-step process: extract data with skip rules, then apply simple mapping
                     console.log('Using GenericBrokerParser for data extraction with skip rules from saved template');
@@ -530,7 +587,16 @@ async function processBrokerFile(fileData) {
                         columnMapping: {} // Empty mapping - we'll apply the real mapping after extraction
                     };
                     const genericParser = GenericBrokerParser.fromTemplate(tempTemplate);
-                    const extractedData = await genericParser.parse(workbook, fileData.name);
+                    let extractedData = await genericParser.parse(selectedWorkbook, fileData.name);
+
+                    // [NEW] Apply data filters if cleanupRules exist
+                    if (template.cleanupRules?.dataFilters && template.cleanupRules.dataFilters.length > 0) {
+                        console.log(`Applying ${template.cleanupRules.dataFilters.length} data filters...`);
+                        const beforeFilterCount = extractedData.length;
+                        extractedData = DataFilterEngine.applyFilters(extractedData, template.cleanupRules.dataFilters);
+                        const afterFilterCount = extractedData.length;
+                        console.log(`Data filters: ${beforeFilterCount} → ${afterFilterCount} rows (${beforeFilterCount - afterFilterCount} removed)`);
+                    }
 
                     // Apply the actual mapping using the existing function
                     console.log('Extracted data length:', extractedData ? extractedData.length : 'null/undefined');
@@ -549,7 +615,15 @@ async function processBrokerFile(fileData) {
                     // Fallback to direct GenericBrokerParser (legacy behavior)
                     console.log('Using direct GenericBrokerParser for custom template (legacy format)');
                     const genericParser = GenericBrokerParser.fromTemplate(template);
-                    parsedData = await genericParser.parse(workbook, fileData.name);
+                    let extractedData = await genericParser.parse(selectedWorkbook, fileData.name);
+
+                    // [NEW] Apply data filters if cleanupRules exist
+                    if (template.cleanupRules?.dataFilters && template.cleanupRules.dataFilters.length > 0) {
+                        console.log(`Applying ${template.cleanupRules.dataFilters.length} data filters (legacy path)...`);
+                        extractedData = DataFilterEngine.applyFilters(extractedData, template.cleanupRules.dataFilters);
+                    }
+
+                    parsedData = extractedData;
                 }
                 break;
 

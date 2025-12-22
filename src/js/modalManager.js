@@ -663,7 +663,209 @@ function showSettingsModal() {
     userSignatureInput.value = window.appSettings.userSignature || '';
     downloadFolderInput.value = window.appSettings.downloadFolder;
 
+    // Set up tab click handlers (do this each time modal opens to ensure handlers are attached)
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        if (tab && tab.dataset) {
+            // Remove existing listeners by cloning
+            const newTab = tab.cloneNode(true);
+            tab.parentNode.replaceChild(newTab, tab);
+
+            // Add fresh click listener
+            newTab.addEventListener('click', () => {
+                switchSettingsTab(newTab.dataset.tab);
+            });
+        }
+    });
+
+    // Reset to General tab
+    switchSettingsTab('general');
+
     modal.classList.add('show');
+}
+
+/**
+ * Switch between settings tabs
+ */
+function switchSettingsTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        const isActive = tab.dataset.tab === tabName;
+        tab.classList.toggle('active', isActive);
+        tab.style.color = isActive ? '#00bcd4' : '#888';
+        tab.style.borderBottomColor = isActive ? '#00bcd4' : 'transparent';
+    });
+
+    // Update tab content
+    document.querySelectorAll('.settings-tab-content').forEach(content => {
+        content.style.display = content.id === `${tabName}-settings-tab` ? 'block' : 'none';
+    });
+
+    // Load file mappings when switching to mappings tab
+    if (tabName === 'mappings') {
+        loadFileMappingsList();
+    }
+}
+
+/**
+ * Load and display file mappings list
+ */
+async function loadFileMappingsList() {
+    const listContainer = document.getElementById('file-mappings-list');
+
+    try {
+        const mappings = await window.loadAllFileMappings();
+
+        if (mappings.length === 0) {
+            listContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: #888;">No file mappings saved yet.</div>';
+            return;
+        }
+
+        listContainer.innerHTML = mappings.map(mapping => `
+            <div class="file-mapping-item" style="padding: 12px 16px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 12px;">
+                <input type="checkbox" class="mapping-checkbox" data-mapping-id="${mapping.id}" style="width: 18px; height: 18px; cursor: pointer;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 500; color: #fff; margin-bottom: 4px;">${mapping.name}</div>
+                    <div style="font-size: 12px; color: #888;">
+                        Keyword: ${mapping.matchingKeyword || 'None'} |
+                        ${Object.keys(mapping.columnMapping || {}).length} mappings |
+                        Created: ${new Date(mapping.created).toLocaleDateString()}
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="deleteSingleMappingFromList('${mapping.id}')" style="padding: 6px 12px; font-size: 12px; background: #d32f2f; border-color: #d32f2f;">Delete</button>
+            </div>
+        `).join('');
+
+        // Add checkbox change listeners
+        document.querySelectorAll('.mapping-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', updateMappingSelectionUI);
+        });
+
+        updateMappingSelectionUI();
+    } catch (error) {
+        console.error('Error loading file mappings:', error);
+        listContainer.innerHTML = '<div style="padding: 24px; text-align: center; color: #f44336;">Error loading file mappings.</div>';
+    }
+}
+
+/**
+ * Update UI based on mapping selection
+ */
+function updateMappingSelectionUI() {
+    const checkboxes = document.querySelectorAll('.mapping-checkbox');
+    const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+
+    document.getElementById('selected-mappings-count').textContent = `${selectedCount} selected`;
+    document.getElementById('export-selected-mappings-btn').disabled = selectedCount === 0;
+    document.getElementById('delete-selected-mappings-btn').disabled = selectedCount === 0;
+}
+
+/**
+ * Select all file mappings
+ */
+function selectAllMappings() {
+    document.querySelectorAll('.mapping-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateMappingSelectionUI();
+}
+
+/**
+ * Deselect all file mappings
+ */
+function deselectAllMappings() {
+    document.querySelectorAll('.mapping-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateMappingSelectionUI();
+}
+
+/**
+ * Export selected file mappings
+ */
+async function exportSelectedMappings() {
+    const selectedIds = Array.from(document.querySelectorAll('.mapping-checkbox:checked'))
+        .map(cb => cb.dataset.mappingId);
+
+    if (selectedIds.length === 0) {
+        alert('Please select at least one mapping to export.');
+        return;
+    }
+
+    try {
+        const allMappings = await window.loadAllFileMappings();
+        const selectedMappings = allMappings.filter(m => selectedIds.includes(m.id));
+
+        // Create export object
+        const exportData = {
+            exportDate: new Date().toISOString(),
+            version: '1.0',
+            mappings: selectedMappings
+        };
+
+        // Create JSON file
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `file-mappings-export-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        alert(`Exported ${selectedMappings.length} file mapping(s) successfully!`);
+    } catch (error) {
+        console.error('Error exporting mappings:', error);
+        alert('Error exporting mappings. Please try again.');
+    }
+}
+
+/**
+ * Delete selected file mappings
+ */
+async function deleteSelectedMappings() {
+    const selectedIds = Array.from(document.querySelectorAll('.mapping-checkbox:checked'))
+        .map(cb => cb.dataset.mappingId);
+
+    if (selectedIds.length === 0) {
+        alert('Please select at least one mapping to delete.');
+        return;
+    }
+
+    const confirmDelete = confirm(
+        `Are you sure you want to delete ${selectedIds.length} file mapping(s)?\n\n` +
+        `This action cannot be undone.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+        for (const id of selectedIds) {
+            await window.deleteFileMapping(id);
+        }
+
+        alert(`Deleted ${selectedIds.length} file mapping(s) successfully!`);
+        loadFileMappingsList(); // Reload the list
+    } catch (error) {
+        console.error('Error deleting mappings:', error);
+        alert('Error deleting mappings. Please try again.');
+    }
+}
+
+/**
+ * Delete a single file mapping (UI wrapper)
+ */
+async function deleteSingleMappingFromList(mappingId) {
+    const confirmDelete = confirm('Are you sure you want to delete this file mapping?\n\nThis action cannot be undone.');
+
+    if (!confirmDelete) return;
+
+    try {
+        await window.deleteFileMapping(mappingId);
+        alert('File mapping deleted successfully!');
+        loadFileMappingsList(); // Reload the list
+    } catch (error) {
+        console.error('Error deleting mapping:', error);
+        alert('Error deleting mapping. Please try again.');
+    }
 }
 
 /**
@@ -1036,6 +1238,13 @@ window.showSettingsModal = showSettingsModal;
 window.hideSettingsModal = hideSettingsModal;
 window.selectDownloadFolder = selectDownloadFolder;
 window.saveSettingsFromModal = saveSettingsFromModal;
+window.switchSettingsTab = switchSettingsTab;
+window.loadFileMappingsList = loadFileMappingsList;
+window.selectAllMappings = selectAllMappings;
+window.deselectAllMappings = deselectAllMappings;
+window.exportSelectedMappings = exportSelectedMappings;
+window.deleteSelectedMappings = deleteSelectedMappings;
+window.deleteSingleMappingFromList = deleteSingleMappingFromList;
 
 // Contacts modal
 window.showContactsModal = showContactsModal;

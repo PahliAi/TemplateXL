@@ -612,6 +612,14 @@ async function loadBrokerContactsFromJSON(file) {
  * @param {Object} mapping - File mapping to save
  * @returns {Promise<boolean>} Success status
  */
+/**
+ * Save file mapping with optional cleanup rules
+ * @param {Object} mapping - Mapping object
+ * @param {Object} mapping.cleanupRules - Optional cleanup configuration
+ * @param {Object} mapping.cleanupRules.preprocessRules - Worksheet level cleanup (removeEmptyRows, removeEmptyColumns, removeHeaderNoise)
+ * @param {Array} mapping.cleanupRules.dataFilters - Data level filters (require-any, numeric-compare, etc.)
+ * @returns {Promise<boolean>} Success status
+ */
 async function saveFileMapping(mapping) {
     try {
         if (!db) await initIndexedDB();
@@ -623,7 +631,8 @@ async function saveFileMapping(mapping) {
             created: mapping.created || new Date().toISOString(),
             lastModified: new Date().toISOString(),
             matchingKeyword: mapping.matchingKeyword || '',
-            creationMethod: mapping.creationMethod || 'unknown'
+            creationMethod: mapping.creationMethod || 'unknown',
+            cleanupRules: mapping.cleanupRules || null  // Store cleanup rules if provided
         };
 
         const transaction = db.transaction(['fileMappings'], 'readwrite');

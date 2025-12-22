@@ -94,7 +94,9 @@ class GenericBrokerParser {
     async parse(workbook, filename) {
         console.log(`Generic parser processing: ${filename}`);
 
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sheetName = workbook.SheetNames[0];
+
+        const worksheet = workbook.Sheets[sheetName];
         const range = XLSX.utils.decode_range(worksheet['!ref']);
 
         // Step 1: Determine data start location (row and column boundaries)

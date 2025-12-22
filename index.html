@@ -273,6 +273,50 @@
                     </div>
                 </div>
 
+                <!-- Data Cleanup Configuration Section -->
+                <div class="section" id="cleanup-config-section" style="margin-top: 32px; border-top: 2px solid #333; padding-top: 24px;">
+                    <h3 class="section-title">Data Cleanup Rules (Optional)</h3>
+
+                    <div style="background: #2a2a2a; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="cleanup-remove-empty-rows" checked style="margin-right: 8px;">
+                                <span style="color: #ccc;">Remove completely empty rows</span>
+                            </label>
+
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="cleanup-remove-empty-columns" style="margin-right: 8px;">
+                                <span style="color: #ccc;">Remove empty columns (threshold:
+                                    <input type="number" id="cleanup-empty-column-threshold" min="0" max="100" value="95"
+                                           style="width: 60px; margin: 0 4px; background: #1a1a1a; border: 1px solid #555; color: white; padding: 2px 6px; border-radius: 4px;">%)
+                                </span>
+                            </label>
+
+                            <label style="display: flex; align-items: flex-start; cursor: pointer;">
+                                <input type="checkbox" id="cleanup-remove-noise-rows" style="margin-right: 8px; margin-top: 4px;">
+                                <div style="flex: 1;">
+                                    <span style="color: #ccc;">Remove rows containing noise patterns</span>
+                                    <div id="cleanup-noise-patterns-config" style="display: none; margin-top: 8px;">
+                                        <input type="text" class="form-input" id="cleanup-noise-patterns-input"
+                                               placeholder="Enter patterns separated by commas (e.g., Totaal, Page, Printed)"
+                                               style="width: 100%; font-size: 13px;">
+                                        <small style="color: #888; font-size: 11px; display: block; margin-top: 4px;">
+                                            Rows containing these text patterns will be removed
+                                        </small>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="background: #2a2a2a; padding: 16px; border-radius: 8px;">
+                        <div id="cleanup-data-filters-container">
+                            <p style="color: #666; font-size: 13px; text-align: center; padding: 16px 0;">No data filters configured.</p>
+                        </div>
+                        <button class="btn btn-secondary" id="cleanup-add-data-filter" style="font-size: 13px; padding: 8px 16px;">+ Add Data Filter</button>
+                    </div>
+                </div>
+
                 <div class="mapping-buttons-container">
                     <button class="btn" id="auto-map-btn">Auto-Map Suggestions</button>
                     <button class="btn btn-secondary" id="save-broker-template-btn">Save New Template</button>
@@ -527,51 +571,79 @@ Met vriendelijke groet,
 
     <!-- Settings Modal -->
     <div class="modal-overlay" id="settings-modal">
-        <div class="modal">
+        <div class="modal" style="max-width: 900px;">
             <div class="modal-header">
                 <h2 class="modal-title">Settings</h2>
                 <button class="modal-close" id="close-settings-modal">×</button>
             </div>
 
+            <!-- Settings Tabs -->
+            <div style="display: flex; border-bottom: 2px solid #333; padding: 0 24px;">
+                <button class="settings-tab active" data-tab="general" style="padding: 12px 24px; background: none; border: none; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 14px; font-weight: 500;">
+                    General
+                </button>
+                <button class="settings-tab" data-tab="mappings" style="padding: 12px 24px; background: none; border: none; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 14px; font-weight: 500;">
+                    File Mappings
+                </button>
+            </div>
+
             <div class="modal-body">
-                <div class="form-group">
-                    <label class="form-label">Your Name</label>
-                    <input type="text" class="form-input" id="user-name-input"
-                           placeholder="Enter your name for audit trail"
-                           value="User">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Email Address</label>
-                    <input type="email" class="form-input" id="user-email-input"
-                           placeholder="Enter your email address"
-                           value="">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Email Signature</label>
-                    <textarea class="form-input" id="user-signature-input"
-                              placeholder="Enter your email signature (optional)"
-                              rows="3"
-                              style="resize: vertical; min-height: 80px;"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Preferred Download Folder</label>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" class="form-input" id="download-folder-input"
-                               placeholder="Default browser download folder will be used"
-                               style="flex: 1;" readonly>
-                        <button class="btn btn-secondary" id="select-folder-btn">Browse</button>
+                <!-- General Settings Tab -->
+                <div class="settings-tab-content active" id="general-settings-tab">
+                    <div class="form-group">
+                        <label class="form-label">Your Name</label>
+                        <input type="text" class="form-input" id="user-name-input"
+                               placeholder="Enter your name for audit trail"
+                               value="User">
                     </div>
-                    <p style="font-size: 12px; color: #888; margin-top: 8px;">
-                        Note: Browser security requires user approval for each download to a specific folder.
-                    </p>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-input" id="user-email-input"
+                               placeholder="Enter your email address"
+                               value="">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Signature</label>
+                        <textarea class="form-input" id="user-signature-input"
+                                  placeholder="Enter your email signature (optional)"
+                                  rows="3"
+                                  style="resize: vertical; min-height: 80px;"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Preferred Download Folder</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" class="form-input" id="download-folder-input"
+                                   placeholder="Default browser download folder will be used"
+                                   style="flex: 1;" readonly>
+                            <button class="btn btn-secondary" id="select-folder-btn">Browse</button>
+                        </div>
+                        <p style="font-size: 12px; color: #888; margin-top: 8px;">
+                            Note: Browser security requires user approval for each download to a specific folder.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- File Mappings Tab -->
+                <div class="settings-tab-content" id="mappings-settings-tab" style="display: none;">
+                    <div style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-secondary" id="select-all-mappings-btn">Select All</button>
+                        <button class="btn btn-secondary" id="deselect-all-mappings-btn">Deselect All</button>
+                        <button class="btn" id="export-selected-mappings-btn" disabled>Export Selected</button>
+                        <button class="btn" id="delete-selected-mappings-btn" disabled style="background: #d32f2f; border-color: #d32f2f;">Delete Selected</button>
+                        <span id="selected-mappings-count" style="margin-left: auto; color: #888; font-size: 14px;">0 selected</span>
+                    </div>
+
+                    <div id="file-mappings-list" style="max-height: 400px; overflow-y: auto; border: 1px solid #333; border-radius: 4px;">
+                        <!-- File mappings will be populated here -->
+                    </div>
                 </div>
             </div>
 
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancel-settings-btn">Cancel</button>
+                <button class="btn btn-secondary" id="cancel-settings-btn">Close</button>
                 <button class="btn" id="save-settings-btn">Save Settings</button>
             </div>
         </div>
@@ -712,6 +784,8 @@ Met vriendelijke groet,
     <script src="src/js/excelCacheManager.js"></script>
     <script src="src/js/dataPatternAnalyzer.js"></script>
     <script src="src/js/autoMapping.js"></script>
+    <script src="src/js/worksheetCleaner.js"></script>
+    <script src="src/js/dataFilterEngine.js"></script>
     <script src="src/js/genericParser.js"></script>
     <script src="src/js/customBrokerTemplateManager.js"></script>
     <script src="src/js/calculationEngine.js"></script>
@@ -721,6 +795,7 @@ Met vriendelijke groet,
 
     <!-- UI Management Modules -->
     <script src="src/js/modalManager.js"></script>
+    <script src="src/js/sheetSelectorManager.js"></script>
     <script src="src/js/dragDropManager.js"></script>
     <script src="src/js/headerSelectionManager.js"></script>
     <script src="src/js/previewManager.js"></script>

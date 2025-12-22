@@ -67,22 +67,89 @@ async function restoreFileMappingContext() {
             const context = JSON.parse(savedContext);
 
             // Validate that the file still exists in uploadedFiles
-            const fileExists = window.uploadedFiles && window.uploadedFiles.find(f => f.id === context.fileId);
+            const fileData = window.uploadedFiles && window.uploadedFiles.find(f => f.id === context.fileId);
 
-            if (fileExists && context.isActive) {
+            if (fileData && context.isActive) {
                 window.fileMappingContext = context;
                 console.log('File-mapping context restored:', context);
 
-                // Auto-select the file in the mapping tab
+                // Load the template FIRST to restore mappings and pattern analysis
+                if (context.mappingTemplateId) {
+                    const allMappings = await window.loadAllFileMappings();
+                    const template = allMappings.find(t => t.id === context.mappingTemplateId);
+
+                    if (template) {
+                        // Link file to template BEFORE loading columns
+                        fileData.broker = {
+                            type: 'custom',
+                            name: template.name,
+                            templateId: template.id
+                        };
+
+                        // Restore column mapping
+                        window.currentMapping = { ...template.columnMapping };
+
+                        // Restore pattern analysis from parsingConfig
+                        if (template.parsingConfig) {
+                            // Calculate endColumn from headerRange if endColumn is missing (old templates)
+                            let endColumnIndex = template.parsingConfig.endColumn;
+
+                            if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerRange) {
+                                // Parse headerRange like "A12:AI13" to extract end column
+                                const rangeMatch = template.parsingConfig.headerRange.match(/:([A-Z]+)\d+$/);
+                                if (rangeMatch) {
+                                    endColumnIndex = XLSX.utils.decode_col(rangeMatch[1]);
+                                    console.log(`Calculated endColumn from headerRange: ${rangeMatch[1]} = ${endColumnIndex}`);
+                                }
+                            }
+
+                            // If still undefined, use startColumn + headerColumns - 1
+                            if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerColumns) {
+                                const startCol = template.parsingConfig.skipColumns || 0;
+                                endColumnIndex = startCol + template.parsingConfig.headerColumns - 1;
+                                console.log(`Calculated endColumn from headerColumns: ${startCol} + ${template.parsingConfig.headerColumns} - 1 = ${endColumnIndex}`);
+                            }
+
+                            window.currentPatternAnalysis = {
+                                dataSection: {
+                                    headerRowIndex: template.parsingConfig.headerRow,
+                                    dataStartIndex: template.parsingConfig.skipRows,
+                                    startColumnIndex: template.parsingConfig.skipColumns,
+                                    endColumnIndex: endColumnIndex // Use calculated value
+                                },
+                                manualSelection: template.parsingConfig.headerRows ? {
+                                    headerRows: template.parsingConfig.headerRows,
+                                    headerColumns: template.parsingConfig.headerColumns,
+                                    headerRange: template.parsingConfig.headerRange,
+                                    footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                                } : null,
+                                suggestedHeaderRow: template.parsingConfig.headerRow,
+                                autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
+                                confidence: 1.0
+                            };
+
+                            // Store pattern analysis in fileData
+                            fileData.patternAnalysis = window.currentPatternAnalysis;
+
+                            console.log('Restored pattern analysis from context template:', window.currentPatternAnalysis);
+                        }
+
+                        showMappingSummary(template.name, 'Saved Template');
+
+                        // Restore cleanup rules (filters) to UI
+                        if (template.cleanupRules) {
+                            restoreCleanupRulesToUI(template.cleanupRules);
+                        }
+                    }
+                }
+
+                // Auto-select the file in the mapping tab and trigger change event
                 const fileSelector = document.getElementById('mapping-file-selector');
                 if (fileSelector && fileSelector.value !== context.fileId.toString()) {
                     fileSelector.value = context.fileId;
-                    await loadSourceColumns(context.fileId);
-                }
-
-                // Load the template mapping if available
-                if (context.mappingTemplateId) {
-                    await loadTemplateMapping(context.mappingTemplateId);
+                    // Trigger change event manually to run the full flow
+                    const changeEvent = new Event('change', { bubbles: true });
+                    fileSelector.dispatchEvent(changeEvent);
                 }
 
                 updateFileMappingContextBanner();
@@ -357,6 +424,29 @@ function showEditTemplateSection() {
  * Apply automatic mapping for known broker types based on their predefined column mappings
  * @param {string} fileId - ID of the selected file
  */
+/**
+ * Show mapping summary banner
+ */
+function showMappingSummary(templateName, templateType) {
+    const summaryDiv = document.getElementById('mapping-summary');
+    const summaryText = document.getElementById('mapping-summary-text');
+
+    if (summaryDiv && summaryText) {
+        summaryText.innerHTML = `<strong>${templateType}:</strong> ${templateName} (${Object.keys(window.currentMapping).length} mappings)`;
+        summaryDiv.style.display = 'block';
+    }
+}
+
+/**
+ * Hide mapping summary banner
+ */
+function hideMappingSummary() {
+    const summaryDiv = document.getElementById('mapping-summary');
+    if (summaryDiv) {
+        summaryDiv.style.display = 'none';
+    }
+}
+
 function applyAutoMappingForBrokerType(fileId) {
     const fileData = window.uploadedFiles?.find(f => f.id == fileId);
     if (!fileData || !fileData.broker || fileData.broker.type !== 'built-in') {
@@ -377,6 +467,9 @@ function applyAutoMappingForBrokerType(fileId) {
     Object.assign(window.currentMapping, brokerMappings);
 
     console.log('Auto-mapping applied:', window.currentMapping);
+
+    // Show mapping summary
+    showMappingSummary(fileData.broker.name, 'Built-in Broker');
 }
 
 /**
@@ -521,12 +614,29 @@ async function loadSourceColumns(fileId) {
 
                 // CRITICAL: Restore pattern analysis from saved parsing config
                 if (template.parsingConfig) {
+                    // Calculate endColumn from headerRange if endColumn is missing (old templates)
+                    let endColumnIndex = template.parsingConfig.endColumn;
+
+                    if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerRange) {
+                        const rangeMatch = template.parsingConfig.headerRange.match(/:([A-Z]+)\d+$/);
+                        if (rangeMatch) {
+                            endColumnIndex = XLSX.utils.decode_col(rangeMatch[1]);
+                            console.log(`Calculated endColumn from headerRange: ${rangeMatch[1]} = ${endColumnIndex}`);
+                        }
+                    }
+
+                    if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerColumns) {
+                        const startCol = template.parsingConfig.skipColumns || 0;
+                        endColumnIndex = startCol + template.parsingConfig.headerColumns - 1;
+                        console.log(`Calculated endColumn from headerColumns: ${startCol} + ${template.parsingConfig.headerColumns} - 1 = ${endColumnIndex}`);
+                    }
+
                     window.currentPatternAnalysis = {
                         dataSection: {
                             headerRowIndex: template.parsingConfig.headerRow,
                             dataStartIndex: template.parsingConfig.skipRows,
                             startColumnIndex: template.parsingConfig.skipColumns,
-                            endColumnIndex: template.parsingConfig.endColumn
+                            endColumnIndex: endColumnIndex
                         },
                         manualSelection: template.parsingConfig.headerRows ? {
                             headerRows: template.parsingConfig.headerRows,
@@ -535,7 +645,9 @@ async function loadSourceColumns(fileId) {
                             footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
                         } : null,
                         suggestedHeaderRow: template.parsingConfig.headerRow,
-                        autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                        suggestedDataEnd: template.parsingConfig.dataEndRow, // Restore data end row for display
+                        autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
+                        confidence: 1.0
                     };
                     console.log(`Restored pattern analysis from template:`, window.currentPatternAnalysis);
                 }
@@ -548,9 +660,15 @@ async function loadSourceColumns(fileId) {
                 // Update UI buttons to show "Update Template" instead of "Save New Template"
                 updateMappingButtons();
 
-                // Load columns with restored analysis and return early to skip normal analysis flow
+                // Load columns with restored analysis FIRST so DOM has source columns
                 const container = document.getElementById('source-columns');
                 await loadSourceColumnsFromAnalysis(fileData.file, window.currentPatternAnalysis, container);
+
+                // THEN restore cleanup rules (filters) to UI - now source columns are in DOM
+                if (template.cleanupRules) {
+                    restoreCleanupRulesToUI(template.cleanupRules);
+                }
+
                 return;
             } else {
                 console.warn(`Template ${fileData.broker.templateId} not found in database`);
@@ -616,10 +734,21 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const range = XLSX.utils.decode_range(worksheet['!ref']);
 
+        // Update suggestedDataEnd if not set (for restored templates without this field)
+        if (patternAnalysis.suggestedDataEnd === undefined) {
+            patternAnalysis.suggestedDataEnd = range.e.r; // Actual last row in worksheet
+            console.log(`Set suggestedDataEnd from worksheet range: ${patternAnalysis.suggestedDataEnd}`);
+        }
+
                 // Extract headers from detected start cell and column range
                 const headerRowIndex = patternAnalysis.suggestedHeaderRow;
                 const startCol = patternAnalysis.dataSection.startColumnIndex || range.s.c;
-                const endCol = patternAnalysis.dataSection.endColumnIndex || range.e.c;
+                // Safety: Handle old templates without endColumn, and ensure it's a valid number
+                let endCol = patternAnalysis.dataSection.endColumnIndex;
+                if (endCol === undefined || endCol === null || isNaN(endCol)) {
+                    endCol = range.e.c; // Fallback to worksheet end column
+                    console.log(`Using fallback end column: ${XLSX.utils.encode_col(endCol)}`);
+                }
                 const headers = [];
 
                 // Check if this is a multi-row header selection
@@ -676,7 +805,11 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
                 // Build header info with optional footer keyword
                 let headerInfo = '';
                 if (isMultiRowHeader) {
-                    headerInfo = `Header Range: ${patternAnalysis.manualSelection.headerRange} (${headerRows} rows), Processing: ${headerRows} rows per record, Data starts: ${XLSX.utils.encode_col(startCol)}${headerRowIndex + headerRows}`;
+                    // Construct header range with row numbers (fallback if not saved in old format)
+                    const headerRange = patternAnalysis.manualSelection.headerRange ||
+                        `${XLSX.utils.encode_cell({ r: headerRowIndex, c: startCol })}:${XLSX.utils.encode_cell({ r: headerRowIndex + headerRows - 1, c: endCol })}`;
+
+                    headerInfo = `Header Range: ${headerRange} (${headerRows} rows), Processing: ${headerRows} rows per record, Data starts: ${XLSX.utils.encode_col(startCol)}${headerRowIndex + headerRows}`;
                     if (patternAnalysis.manualSelection.footerKeyword) {
                         headerInfo += `<br>Footer Keyword: "${patternAnalysis.manualSelection.footerKeyword}"`;
                     }
@@ -997,6 +1130,211 @@ function generateAutoMappingSuggestions() {
     }
 }
 
+/**
+ * Collect cleanup rules from UI
+ */
+function getCleanupRulesFromUI() {
+    // Worksheet preprocessing rules
+    const removeEmptyRows = document.getElementById('cleanup-remove-empty-rows').checked;
+    const removeEmptyColumns = document.getElementById('cleanup-remove-empty-columns').checked;
+    const emptyColumnThreshold = parseInt(document.getElementById('cleanup-empty-column-threshold').value) || 95;
+    const removeNoiseRows = document.getElementById('cleanup-remove-noise-rows').checked;
+    const noisePatternsInput = document.getElementById('cleanup-noise-patterns-input').value;
+    const noisePatterns = noisePatternsInput ? noisePatternsInput.split(',').map(p => p.trim()).filter(p => p) : [];
+
+    // Data filters
+    const dataFiltersContainer = document.getElementById('cleanup-data-filters-container');
+    const dataFilters = [];
+
+    // Extract data filter rules from UI
+    dataFiltersContainer.querySelectorAll('.data-filter-rule').forEach(filterEl => {
+        const filterType = filterEl.querySelector('.filter-type-select')?.value;
+        const filterField = filterEl.querySelector('.filter-field-input')?.value; // Now a select element
+        const filterValue = filterEl.querySelector('.filter-value-input')?.value;
+
+        if (filterType && filterField) {
+            const filter = {
+                type: filterType,
+                field: filterField
+            };
+
+            // Only include value for filter types that need it
+            const needsValue = !['empty', 'not-empty', 'date-valid'].includes(filterType);
+            if (needsValue && filterValue) {
+                filter.value = filterValue;
+            }
+
+            dataFilters.push(filter);
+        }
+    });
+
+    return {
+        preprocessRules: {
+            removeEmptyRows: removeEmptyRows,
+            removeEmptyColumns: removeEmptyColumns,
+            emptyColumnThreshold: emptyColumnThreshold,
+            removeHeaderNoise: removeNoiseRows,
+            noisePatterns: noisePatterns
+        },
+        dataFilters: dataFilters
+    };
+}
+
+/**
+ * Restore cleanup rules to UI from template
+ */
+function restoreCleanupRulesToUI(cleanupRules) {
+    if (!cleanupRules) {
+        console.log('No cleanup rules to restore');
+        return;
+    }
+
+    console.log('Restoring cleanup rules to UI:', cleanupRules);
+
+    // Restore preprocessing rules
+    if (cleanupRules.preprocessRules) {
+        const preprocessRules = cleanupRules.preprocessRules;
+
+        document.getElementById('cleanup-remove-empty-rows').checked = preprocessRules.removeEmptyRows || false;
+        document.getElementById('cleanup-remove-empty-columns').checked = preprocessRules.removeEmptyColumns || false;
+        document.getElementById('cleanup-empty-column-threshold').value = preprocessRules.emptyColumnThreshold || 95;
+        document.getElementById('cleanup-remove-noise-rows').checked = preprocessRules.removeHeaderNoise || false;
+
+        // Show/hide noise patterns config
+        const noisePatternsConfig = document.getElementById('cleanup-noise-patterns-config');
+        if (preprocessRules.removeHeaderNoise) {
+            noisePatternsConfig.style.display = 'block';
+            document.getElementById('cleanup-noise-patterns-input').value = (preprocessRules.noisePatterns || []).join(', ');
+        } else {
+            noisePatternsConfig.style.display = 'none';
+        }
+    }
+
+    // Restore data filters
+    if (cleanupRules.dataFilters && cleanupRules.dataFilters.length > 0) {
+        const container = document.getElementById('cleanup-data-filters-container');
+
+        // Clear existing filters
+        container.innerHTML = '';
+
+        // Add each saved filter
+        cleanupRules.dataFilters.forEach(filter => {
+            addDataFilterRule(); // Create empty filter UI
+
+            // Get the last added filter (the one we just created)
+            const filterElements = container.querySelectorAll('.data-filter-rule');
+            const lastFilter = filterElements[filterElements.length - 1];
+
+            if (lastFilter) {
+                // Set filter type
+                const typeSelect = lastFilter.querySelector('.filter-type-select');
+                if (typeSelect) {
+                    typeSelect.value = filter.type || 'not-empty';
+                    // Trigger change to show/hide value input
+                    typeSelect.dispatchEvent(new Event('change'));
+                }
+
+                // Set filter field
+                const fieldSelect = lastFilter.querySelector('.filter-field-input');
+                if (fieldSelect) {
+                    fieldSelect.value = filter.field || '';
+                }
+
+                // Set filter value (if applicable)
+                const valueInput = lastFilter.querySelector('.filter-value-input');
+                if (valueInput && filter.value) {
+                    valueInput.value = filter.value;
+                }
+            }
+        });
+
+        console.log(`Restored ${cleanupRules.dataFilters.length} data filters to UI`);
+    }
+}
+
+/**
+ * Add a new data filter rule to UI
+ */
+function addDataFilterRule() {
+    const container = document.getElementById('cleanup-data-filters-container');
+
+    // Remove "no filters" message if present
+    const noFiltersMsg = container.querySelector('p');
+    if (noFiltersMsg) {
+        noFiltersMsg.remove();
+    }
+
+    // Get available column names from displayed source columns in UI
+    const availableColumns = [];
+    const sourceColumnItems = document.querySelectorAll('#source-columns .column-item');
+    sourceColumnItems.forEach(item => {
+        const columnName = item.getAttribute('data-column-name');
+        if (columnName) {
+            availableColumns.push(columnName);
+        }
+    });
+
+    // Create filter rule UI
+    const filterDiv = document.createElement('div');
+    filterDiv.className = 'data-filter-rule';
+    filterDiv.style.cssText = 'background: #1a1a1a; padding: 12px; border-radius: 4px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center;';
+
+    // Build column options
+    let columnOptions = '<option value="">Select column...</option>';
+    if (availableColumns.length === 0) {
+        columnOptions += '<option value="" disabled>No columns available - select a file first</option>';
+    }
+    availableColumns.forEach(col => {
+        columnOptions += `<option value="${col}">${col}</option>`;
+    });
+
+    filterDiv.innerHTML = `
+        <select class="filter-type-select" style="background: #2a2a2a; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; font-size: 12px;">
+            <option value="not-empty">Field not empty</option>
+            <option value="date-valid">Date is valid</option>
+            <option value="require-any">Require any field</option>
+            <option value="require-all">Require all fields</option>
+            <option value="exclude-values">Exclude values</option>
+            <option value="include-values">Include values</option>
+            <option value="numeric-compare">Numeric comparison</option>
+            <option value="text-contains">Text contains</option>
+            <option value="text-not-contains">Text not contains</option>
+            <option value="empty">Field is empty</option>
+            <option value="regex">Regex pattern</option>
+        </select>
+        <select class="filter-field-input" style="flex: 1; background: #2a2a2a; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; font-size: 12px;">
+            ${columnOptions}
+        </select>
+        <input type="text" class="filter-value-input" placeholder="Value (if applicable)"
+               style="flex: 1; background: #2a2a2a; border: 1px solid #555; color: white; padding: 6px; border-radius: 4px; font-size: 12px; display: none;">
+        <button class="btn btn-secondary" onclick="this.parentElement.remove()"
+                style="padding: 6px 10px; font-size: 12px; background: #d32f2f; border-color: #d32f2f;">Remove</button>
+    `;
+
+    container.appendChild(filterDiv);
+
+    // Add event listener to show/hide value input based on filter type
+    const typeSelect = filterDiv.querySelector('.filter-type-select');
+    const valueInput = filterDiv.querySelector('.filter-value-input');
+
+    typeSelect.addEventListener('change', () => {
+        const filterType = typeSelect.value;
+        const needsValue = !['empty', 'not-empty', 'date-valid'].includes(filterType);
+        valueInput.style.display = needsValue ? 'block' : 'none';
+
+        // Update placeholder based on filter type
+        if (filterType === 'numeric-compare') {
+            valueInput.placeholder = 'e.g., >100 or <50';
+        } else if (filterType === 'regex') {
+            valueInput.placeholder = 'Regex pattern';
+        } else if (filterType.includes('values')) {
+            valueInput.placeholder = 'Comma-separated values';
+        } else {
+            valueInput.placeholder = 'Value';
+        }
+    });
+}
+
 async function saveBrokerTemplate() {
     if (!window.currentMappingFile || Object.keys(window.currentMapping).length === 0) {
         alert('Please select a file and create at least one mapping before saving.');
@@ -1088,6 +1426,12 @@ async function saveBrokerTemplate() {
             parsingConfig.skipRows = analysis.dataStartIndex || 0;
             parsingConfig.skipColumns = analysis.startColumnIndex || 0;
             parsingConfig.headerRow = analysis.headerRowIndex;
+            parsingConfig.endColumn = analysis.endColumnIndex; // CRITICAL: Save end column for range restoration
+
+            // Save suggestedDataEnd for proper display restoration
+            if (window.currentPatternAnalysis.suggestedDataEnd !== undefined) {
+                parsingConfig.dataEndRow = window.currentPatternAnalysis.suggestedDataEnd;
+            }
 
             // Add enhanced parsingConfig fields for manual selections
             if (window.currentPatternAnalysis.manualSelection) {
@@ -1127,6 +1471,10 @@ async function saveBrokerTemplate() {
             console.log(`Start cell detected: ${analysis.startCell || 'A1'}`);
         }
 
+        // Collect cleanup rules from UI
+        const cleanupRules = getCleanupRulesFromUI();
+        console.log('Collected cleanup rules:', cleanupRules);
+
         // Create file mapping object (unified format)
         const fileMapping = {
             id: `mapping-${Date.now()}`,
@@ -1138,6 +1486,7 @@ async function saveBrokerTemplate() {
             filePattern: window.currentMappingFile.name,
             parsingConfig: parsingConfig,
             columnMapping: { ...window.currentMapping },
+            cleanupRules: cleanupRules,
             created: new Date().toISOString(),
             lastModified: new Date().toISOString(),
             version: '1.0',
@@ -1241,6 +1590,12 @@ async function updateBrokerTemplate() {
             parsingConfig.skipRows = analysis.dataStartIndex || 0;
             parsingConfig.skipColumns = analysis.startColumnIndex || 0;
             parsingConfig.headerRow = analysis.headerRowIndex;
+            parsingConfig.endColumn = analysis.endColumnIndex; // CRITICAL: Save end column for range restoration
+
+            // Save suggestedDataEnd for proper display restoration
+            if (window.currentPatternAnalysis.suggestedDataEnd !== undefined) {
+                parsingConfig.dataEndRow = window.currentPatternAnalysis.suggestedDataEnd;
+            }
 
             // Add enhanced parsingConfig fields for manual selections
             if (window.currentPatternAnalysis.manualSelection) {
@@ -1369,6 +1724,69 @@ async function handleBrokerTemplateImport(event) {
 
         // Apply the imported mapping to current session
         window.currentMapping = { ...template.columnMapping };
+
+        // Restore pattern analysis from parsingConfig (CRITICAL for header/footer info)
+        if (template.parsingConfig) {
+            // Calculate endColumn from headerRange if endColumn is missing (old templates)
+            let endColumnIndex = template.parsingConfig.endColumn;
+
+            if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerRange) {
+                const rangeMatch = template.parsingConfig.headerRange.match(/:([A-Z]+)\d+$/);
+                if (rangeMatch) {
+                    endColumnIndex = XLSX.utils.decode_col(rangeMatch[1]);
+                    console.log(`Calculated endColumn from headerRange: ${rangeMatch[1]} = ${endColumnIndex}`);
+                }
+            }
+
+            if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerColumns) {
+                const startCol = template.parsingConfig.skipColumns || 0;
+                endColumnIndex = startCol + template.parsingConfig.headerColumns - 1;
+                console.log(`Calculated endColumn from headerColumns: ${startCol} + ${template.parsingConfig.headerColumns} - 1 = ${endColumnIndex}`);
+            }
+
+            window.currentPatternAnalysis = {
+                dataSection: {
+                    headerRowIndex: template.parsingConfig.headerRow,
+                    dataStartIndex: template.parsingConfig.skipRows,
+                    startColumnIndex: template.parsingConfig.skipColumns,
+                    endColumnIndex: endColumnIndex
+                },
+                manualSelection: template.parsingConfig.headerRows ? {
+                    headerRows: template.parsingConfig.headerRows,
+                    headerColumns: template.parsingConfig.headerColumns,
+                    headerRange: template.parsingConfig.headerRange,
+                    footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                } : null,
+                suggestedHeaderRow: template.parsingConfig.headerRow,
+                autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
+                confidence: 1.0
+            };
+
+            console.log('Restored pattern analysis from template:', window.currentPatternAnalysis);
+        }
+
+        // Link current file to template (if file selected)
+        if (window.currentMappingFile) {
+            window.currentMappingFile.broker = {
+                type: 'custom',
+                name: template.name,
+                templateId: template.id
+            };
+
+            // Store pattern analysis in fileData to prevent re-analysis
+            window.currentMappingFile.patternAnalysis = window.currentPatternAnalysis;
+
+            console.log('Linked template to current file:', window.currentMappingFile.name);
+
+            // Reload source columns with restored pattern analysis
+            await loadSourceColumns(window.currentMappingFile.id);
+        }
+
+        // Restore cleanup rules (filters) to UI
+        if (template.cleanupRules) {
+            restoreCleanupRulesToUI(template.cleanupRules);
+        }
+
         updateTemplateDropZones();
 
         console.log('Broker template imported:', template);
@@ -2317,12 +2735,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Mapping tab functionality
     const mappingFileSelector = document.getElementById('mapping-file-selector');
-    mappingFileSelector.addEventListener('change', (e) => {
+    mappingFileSelector.addEventListener('change', async (e) => {
         const fileId = e.target.value;
         if (fileId) {
-            loadSourceColumns(fileId);
-            // Auto-map for known broker types
-            applyAutoMappingForBrokerType(fileId);
+            const fileData = window.uploadedFiles?.find(f => f.id == fileId);
+
+            // Detect and link template BEFORE loading columns (unless already linked by context restore)
+            if (fileData && !fileData.broker?.templateId) {
+                const detection = await detectBrokerType(fileData.name);
+
+                if (detection.type === 'custom' && detection.template) {
+                    console.log('Loading saved template:', detection.template.name);
+
+                    // Link file to template BEFORE loading columns
+                    fileData.broker = {
+                        type: 'custom',
+                        name: detection.template.name,
+                        templateId: detection.template.id
+                    };
+
+                    // Load column mapping
+                    window.currentMapping = { ...detection.template.columnMapping };
+
+                    // Show mapping summary
+                    showMappingSummary(detection.template.name, 'Saved Template');
+                } else if (detection.type === 'built-in') {
+                    // Auto-map for built-in broker types
+                    applyAutoMappingForBrokerType(fileId);
+                }
+            } else if (fileData?.broker?.templateId) {
+                console.log('File already linked to template:', fileData.broker.name);
+            }
+
+            // NOW load columns (will find template link and restore pattern analysis if needed)
+            await loadSourceColumns(fileId);
             updateTemplateDropZones();
         } else {
             document.getElementById('source-columns').innerHTML = '<div style="text-align: center; padding: 32px; color: #888;"><p>Select a file to see available columns</p></div>';
@@ -2339,6 +2785,14 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('update-broker-template-btn').addEventListener('click', updateBrokerTemplate);
     document.getElementById('import-broker-template-btn').addEventListener('click', importBrokerTemplate);
     document.getElementById('process-with-template-btn').addEventListener('click', processFileWithTemplate);
+
+    // Cleanup configuration event listeners
+    document.getElementById('cleanup-remove-noise-rows').addEventListener('change', (e) => {
+        const configDiv = document.getElementById('cleanup-noise-patterns-config');
+        configDiv.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('cleanup-add-data-filter').addEventListener('click', addDataFilterRule);
 
     // Keyword management button
     const refreshTemplatesBtn = document.getElementById('refresh-templates-btn');
@@ -2379,6 +2833,12 @@ document.addEventListener('DOMContentLoaded', function() {
     selectFolderBtn.addEventListener('click', selectDownloadFolder);
     saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
     cancelSettingsBtn.addEventListener('click', hideSettingsModal);
+
+    // File mappings management (tab switching is now handled in showSettingsModal)
+    document.getElementById('select-all-mappings-btn').addEventListener('click', selectAllMappings);
+    document.getElementById('deselect-all-mappings-btn').addEventListener('click', deselectAllMappings);
+    document.getElementById('export-selected-mappings-btn').addEventListener('click', exportSelectedMappings);
+    document.getElementById('delete-selected-mappings-btn').addEventListener('click', deleteSelectedMappings);
 
     // Contact management event listeners
     const contactsBtn = document.getElementById('contacts-btn');
@@ -2493,9 +2953,10 @@ async function processFileWithTemplate() {
             detection = await window.detectBrokerType(window.currentMappingFile.file.name);
             console.log('Process with Template: Template detection result:', detection);
 
-            if (detection && detection.type === 'custom' && detection.template) {
+            if (detection && (detection.type === 'built-in' || (detection.type === 'custom' && detection.template))) {
                 // Use the same broker parser flow as automatic upload
-                console.log('Process with Template: Using saved template:', detection.template.name);
+                const parserName = detection.type === 'built-in' ? detection.name : detection.template.name;
+                console.log('Process with Template: Using parser/template:', parserName);
                 console.log('Process with Template: Calling processBrokerFile...');
                 const result = await window.processBrokerFile({
                     file: window.currentMappingFile.file,
@@ -2512,7 +2973,14 @@ async function processFileWithTemplate() {
                     console.log('Process with Template: Processed data length:', processedData ? processedData.length : 0);
 
                     if (!processedData || processedData.length === 0) {
-                        throw new Error('No data was processed from the template');
+                        throw new Error(
+                            'No data was processed from the template.\n\n' +
+                            'Possible causes:\n' +
+                            '1. Data filters are too restrictive (check console for filter details)\n' +
+                            '2. No valid data rows found in the selected sheet\n' +
+                            '3. Header/footer detection excluded all data\n\n' +
+                            'Check browser console (F12) for detailed filter statistics.'
+                        );
                     }
                 } else if (result.needsTemplate) {
                     throw new Error('Template processing failed - template needs to be recreated');
@@ -2521,8 +2989,8 @@ async function processFileWithTemplate() {
                     throw new Error(`Template processing failed: ${errorMsg}`);
                 }
             } else {
-                console.log('Process with Template: No template detected or wrong type:', detection);
-                throw new Error('No saved template found for this file. Please save a template first.');
+                console.log('Process with Template: No parser/template detected or wrong type:', detection);
+                throw new Error('No parser or template found for this file. Please save a template or use a supported broker format.');
             }
 
             // Cache the processed data for future use
@@ -2534,12 +3002,13 @@ async function processFileWithTemplate() {
         // Update the current file with processed data (match fileManager.js pattern)
         window.currentMappingFile.parsedData = processedData;
         window.currentMappingFile.recordCount = processedData.length;
-        window.currentMappingFile.status = 'Processed with Template';
+        const processingType = detection.type === 'built-in' ? 'Parser' : 'Template';
+        window.currentMappingFile.status = `Processed with ${processingType}`;
         window.currentMappingFile.statusClass = 'status-success';
 
-        // Update broker info to indicate template usage
+        // Update broker info to indicate processing method
         if (window.currentMappingFile.broker) {
-            window.currentMappingFile.broker.name = `${window.currentMappingFile.broker.name} (Template)`;
+            window.currentMappingFile.broker.name = `${window.currentMappingFile.broker.name} (${processingType})`;
         }
 
         // Store processed data globally for results tab
