@@ -153,6 +153,11 @@ async function restoreFileMappingContext() {
                 }
 
                 updateFileMappingContextBanner();
+
+                // Update template drop zones to display FIXED: and CALC: mappings visually
+                // (needed when file selector value doesn't change and change event doesn't fire)
+                updateTemplateDropZones();
+
                 return true;
             } else {
                 console.log('Context invalid or file no longer available');
@@ -587,271 +592,8 @@ function updateMappingFileSelector() {
 }
 
 
-async function loadSourceColumns(fileId) {
-    const fileData = window.uploadedFiles?.find(f => f.id == fileId);
-    if (!fileData) return;
-
-    window.currentMappingFile = fileData;
-
-    // Clear old context first - will be restored below if this file has a saved template
-    clearFileMappingContext();
-
-    // Check if this file has a saved template and restore the context
-    if (fileData.broker && fileData.broker.type === 'custom' && fileData.broker.templateId) {
-        console.log(`File has saved template: ${fileData.broker.name} (ID: ${fileData.broker.templateId})`);
-
-        // Load the template to restore mappings
-        try {
-            const allMappings = await window.loadAllFileMappings();
-            const template = allMappings.find(t => t.id === fileData.broker.templateId);
-
-            if (template) {
-                // Restore the file mapping context
-                saveFileMappingContext(fileData, template.id, template.name);
-
-                // Restore the column mapping
-                window.currentMapping = { ...template.columnMapping };
-
-                // CRITICAL: Restore pattern analysis from saved parsing config
-                if (template.parsingConfig) {
-                    // Calculate endColumn from headerRange if endColumn is missing (old templates)
-                    let endColumnIndex = template.parsingConfig.endColumn;
-
-                    if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerRange) {
-                        const rangeMatch = template.parsingConfig.headerRange.match(/:([A-Z]+)\d+$/);
-                        if (rangeMatch) {
-                            endColumnIndex = XLSX.utils.decode_col(rangeMatch[1]);
-                            console.log(`Calculated endColumn from headerRange: ${rangeMatch[1]} = ${endColumnIndex}`);
-                        }
-                    }
-
-                    if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerColumns) {
-                        const startCol = template.parsingConfig.skipColumns || 0;
-                        endColumnIndex = startCol + template.parsingConfig.headerColumns - 1;
-                        console.log(`Calculated endColumn from headerColumns: ${startCol} + ${template.parsingConfig.headerColumns} - 1 = ${endColumnIndex}`);
-                    }
-
-                    window.currentPatternAnalysis = {
-                        dataSection: {
-                            headerRowIndex: template.parsingConfig.headerRow,
-                            dataStartIndex: template.parsingConfig.skipRows,
-                            startColumnIndex: template.parsingConfig.skipColumns,
-                            endColumnIndex: endColumnIndex
-                        },
-                        manualSelection: template.parsingConfig.headerRows ? {
-                            headerRows: template.parsingConfig.headerRows,
-                            headerColumns: template.parsingConfig.headerColumns,
-                            headerRange: template.parsingConfig.headerRange,
-                            footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
-                        } : null,
-                        suggestedHeaderRow: template.parsingConfig.headerRow,
-                        suggestedDataEnd: template.parsingConfig.dataEndRow, // Restore data end row for display
-                        autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
-                        confidence: 1.0
-                    };
-                    console.log(`Restored pattern analysis from template:`, window.currentPatternAnalysis);
-                }
-
-                console.log(`Restored template context: ${template.name} with ${Object.keys(window.currentMapping).length} mappings`);
-
-                // Store restored analysis in fileData to prevent re-analysis overwriting it
-                fileData.patternAnalysis = window.currentPatternAnalysis;
-
-                // Update UI buttons to show "Update Template" instead of "Save New Template"
-                updateMappingButtons();
-
-                // Load columns with restored analysis FIRST so DOM has source columns
-                const container = document.getElementById('source-columns');
-                await loadSourceColumnsFromAnalysis(fileData.file, window.currentPatternAnalysis, container);
-
-                // THEN restore cleanup rules (filters) to UI - now source columns are in DOM
-                if (template.cleanupRules) {
-                    restoreCleanupRulesToUI(template.cleanupRules);
-                }
-
-                return;
-            } else {
-                console.warn(`Template ${fileData.broker.templateId} not found in database`);
-            }
-        } catch (error) {
-            console.error('Error restoring template context:', error);
-        }
-    }
-
-    const container = document.getElementById('source-columns');
-
-    try {
-        if (fileData.file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-            fileData.file.name.endsWith('.xlsx')) {
-
-            // Show loading message
-            container.innerHTML = '<div style="text-align: center; padding: 32px; color: #888;"><p>Analyzing file structure...</p></div>';
-
-            try {
-                // Use cached pattern analysis if available, otherwise analyze file
-                let patternAnalysis = fileData.patternAnalysis;
-
-                if (!patternAnalysis) {
-                    console.log('No cached analysis found, running analysis for mapping tab');
-                    patternAnalysis = await DataPatternAnalyzer.analyzeFile(fileData.file);
-                    // Cache the analysis result
-                    fileData.patternAnalysis = patternAnalysis;
-                }
-
-                console.log('Using pattern analysis for mapping tab:', patternAnalysis);
-
-                // Store globally for template saving
-                window.currentPatternAnalysis = patternAnalysis;
-
-                if (patternAnalysis.confidence > 0.3 && patternAnalysis.headerAnalysis?.found) {
-                    // High confidence - use detected structure
-                    await loadSourceColumnsFromAnalysis(fileData.file, patternAnalysis, container);
-                } else {
-                    // Low confidence or analysis failed - show manual selection interface
-                    await showManualColumnSelection(fileData, container);
-                }
-
-            } catch (analysisError) {
-                console.warn('Pattern analysis failed, showing manual selection:', analysisError);
-                await showManualColumnSelection(fileData, container);
-            }
-
-        } else {
-            container.innerHTML = '<div style="text-align: center; padding: 32px; color: #888;"><p>PDF files require manual processing</p></div>';
-        }
-    } catch (error) {
-        console.error('Error loading source columns:', error);
-        container.innerHTML = '<div style="text-align: center; padding: 32px; color: #f44336;"><p>Error loading file</p></div>';
-    }
-}
-
-/**
- * Load source columns using pattern analysis results
- */
-async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
-    try {
-        const workbook = await ExcelCacheManager.getWorkbook(file);
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const range = XLSX.utils.decode_range(worksheet['!ref']);
-
-        // Update suggestedDataEnd if not set (for restored templates without this field)
-        if (patternAnalysis.suggestedDataEnd === undefined) {
-            patternAnalysis.suggestedDataEnd = range.e.r; // Actual last row in worksheet
-            console.log(`Set suggestedDataEnd from worksheet range: ${patternAnalysis.suggestedDataEnd}`);
-        }
-
-                // Extract headers from detected start cell and column range
-                const headerRowIndex = patternAnalysis.suggestedHeaderRow;
-                const startCol = patternAnalysis.dataSection.startColumnIndex || range.s.c;
-                // Safety: Handle old templates without endColumn, and ensure it's a valid number
-                let endCol = patternAnalysis.dataSection.endColumnIndex;
-                if (endCol === undefined || endCol === null || isNaN(endCol)) {
-                    endCol = range.e.c; // Fallback to worksheet end column
-                    console.log(`Using fallback end column: ${XLSX.utils.encode_col(endCol)}`);
-                }
-                const headers = [];
-
-                // Check if this is a multi-row header selection
-                const isMultiRowHeader = patternAnalysis.manualSelection && patternAnalysis.manualSelection.headerRows > 1;
-                const headerRows = isMultiRowHeader ? patternAnalysis.manualSelection.headerRows : 1;
-
-                console.log(`Extracting headers from start cell ${patternAnalysis.dataSection.startCell || 'A1'}, ${headerRows} header row(s), columns ${XLSX.utils.encode_col(startCol)} to ${XLSX.utils.encode_col(endCol)}`);
-
-                if (isMultiRowHeader) {
-                    // Multi-row header: Create separate columns for each row
-                    for (let row = 0; row < headerRows; row++) {
-                        for (let col = startCol; col <= endCol; col++) {
-                            const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex + row, c: col });
-                            const cell = worksheet[cellAddress];
-                            let headerText = '';
-
-                            if (cell && cell.v) {
-                                // Normalize: remove line breaks, collapse multiple spaces to single space
-                                headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
-                            } else {
-                                headerText = `Row${row + 1}_Col${XLSX.utils.encode_col(col)}`;
-                            }
-
-                            headers.push(headerText);
-                        }
-                    }
-                } else {
-                    // Single row header (existing behavior)
-                    for (let col = startCol; col <= endCol; col++) {
-                        const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: col });
-                        const cell = worksheet[cellAddress];
-                        let headerText = '';
-
-                        if (cell && cell.v) {
-                            // Normalize: remove line breaks, collapse multiple spaces to single space
-                            headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
-                        } else {
-                            headerText = `Column ${XLSX.utils.encode_col(col)}`;
-                        }
-
-                        headers.push(headerText);
-                    }
-                }
-
-                // Auto-detect footer keywords in the last 10 rows
-                const autoFooterKeyword = detectFooterKeyword(worksheet, range, startCol, endCol);
-                if (autoFooterKeyword) {
-                    patternAnalysis.autoFooterKeyword = autoFooterKeyword;
-                    console.log(`Auto-detected footer keyword: "${autoFooterKeyword}"`);
-                }
-
-                // Show confidence and detected structure info
-                const startCell = patternAnalysis.dataSection.startCell || `${XLSX.utils.encode_col(startCol)}${headerRowIndex + 1}`;
-                // Build header info with optional footer keyword
-                let headerInfo = '';
-                if (isMultiRowHeader) {
-                    // Construct header range with row numbers (fallback if not saved in old format)
-                    const headerRange = patternAnalysis.manualSelection.headerRange ||
-                        `${XLSX.utils.encode_cell({ r: headerRowIndex, c: startCol })}:${XLSX.utils.encode_cell({ r: headerRowIndex + headerRows - 1, c: endCol })}`;
-
-                    headerInfo = `Header Range: ${headerRange} (${headerRows} rows), Processing: ${headerRows} rows per record, Data starts: ${XLSX.utils.encode_col(startCol)}${headerRowIndex + headerRows}`;
-                    if (patternAnalysis.manualSelection.footerKeyword) {
-                        headerInfo += `<br>Footer Keyword: "${patternAnalysis.manualSelection.footerKeyword}"`;
-                    }
-                } else {
-                    headerInfo = `Start Cell: ${startCell}, Data Range: ${XLSX.utils.encode_col(startCol)}${headerRowIndex + 1}:${XLSX.utils.encode_col(endCol)}${patternAnalysis.suggestedDataEnd + 1}`;
-                    // Check if auto-detected footer keyword exists
-                    if (patternAnalysis.autoFooterKeyword) {
-                        headerInfo += `<br>Auto-detected Footer: "${patternAnalysis.autoFooterKeyword}"`;
-                    }
-                }
-
-                const structureType = isMultiRowHeader ? 'Manual Header & Footer Selection' : 'Automatic Header & Footer Detection';
-
-                const confidenceInfo = `
-                    <div style="background: #e8f4f8; padding: 12px; margin-bottom: 16px; border-radius: 4px; border-left: 4px solid #00bcd4; color: black;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong style="color: #00bcd4;">${structureType}</strong><br>
-                                ${headerInfo}<br>
-                                Confidence: ${Math.round(patternAnalysis.confidence * 100)}%
-                            </div>
-                            <button class="btn btn-secondary" onclick="showManualHeaderSelection()" style="margin-left: 12px;">Manual select header & footer</button>
-                        </div>
-                    </div>
-                `;
-
-                container.innerHTML = confidenceInfo;
-                displaySourceColumns(headers);
-
-                // Trigger auto-mapping for high-confidence detections
-                if (patternAnalysis.confidence > 0.7) {
-                    console.log('High confidence detection - triggering auto-mapping');
-                    setTimeout(() => {
-                        generateAutoMappingSuggestions();
-                    }, 200); // Small delay to ensure columns are loaded
-                }
-
-    } catch (error) {
-        console.error('Error extracting columns from analysis:', error);
-        throw error;
-    }
-}
+// loadSourceColumns is defined in dragDropManager.js and exported to window
+// loadSourceColumnsFromAnalysis is defined in dragDropManager.js and exported to window
 
 /**
  * Show manual grid selection interface when analysis fails
@@ -1074,15 +816,7 @@ function updateMappingSummary(confidenceScores) {
     summaryDiv.style.display = 'block';
 }
 
-/**
- * Hide mapping summary display
- */
-function hideMappingSummary() {
-    const summaryDiv = document.getElementById('mapping-summary');
-    if (summaryDiv) {
-        summaryDiv.style.display = 'none';
-    }
-}
+// Duplicate hideMappingSummary removed - defined above at line ~448
 
 // Auto-mapping functionality moved to AutoMapping class
 
@@ -1092,7 +826,19 @@ function generateAutoMappingSuggestions() {
         return;
     }
 
-    console.log('Starting matrix-based auto-mapping...');
+    // Don't overwrite saved template mappings
+    console.log('generateAutoMappingSuggestions - checking broker info:', {
+        hasBroker: !!window.currentMappingFile.broker,
+        brokerType: window.currentMappingFile.broker?.type,
+        templateId: window.currentMappingFile.broker?.templateId,
+        currentMappingCount: Object.keys(window.currentMapping).length
+    });
+    if (window.currentMappingFile.broker?.type === 'custom' && window.currentMappingFile.broker?.templateId) {
+        console.log('Skipping auto-mapping - file has saved template:', window.currentMappingFile.broker.name);
+        return;
+    }
+
+    console.log('Starting matrix-based auto-mapping... (will clear current mapping!)');
 
     // Clear existing mapping
     window.currentMapping = {};
@@ -1129,6 +875,9 @@ function generateAutoMappingSuggestions() {
         alert(`Auto-mapping failed: ${error.message}`);
     }
 }
+
+// Export to window so dragDropManager.js can call it
+window.generateAutoMappingSuggestions = generateAutoMappingSuggestions;
 
 /**
  * Collect cleanup rules from UI
@@ -2041,119 +1790,8 @@ function displayFileStats(displayData, fileData, totalRecords) {
  * @param {string} mimeType - MIME type for the file
  * @returns {Promise<boolean>} Success status
  */
-async function downloadToPreferredFolder(blob, filename, mimeType = 'application/octet-stream') {
-    try {
-        // Check if File System Access API is available
-        if ('showSaveFilePicker' in window) {
-            // Determine file type options based on extension
-            let fileTypes = [];
-            if (filename.endsWith('.json')) {
-                fileTypes = [{
-                    description: 'JSON files',
-                    accept: {'application/json': ['.json']}
-                }];
-            } else if (filename.endsWith('.eml')) {
-                fileTypes = [{
-                    description: 'Email files',
-                    accept: {'message/rfc822': ['.eml']}
-                }];
-            } else {
-                fileTypes = [{
-                    description: 'All files',
-                    accept: {'*/*': []}
-                }];
-            }
-
-            // Use showSaveFilePicker with preferred folder as starting directory
-            const options = {
-                suggestedName: filename,
-                types: fileTypes
-            };
-
-            // If we have a folder handle, use it as starting directory suggestion
-            if (appSettings.downloadFolderHandle) {
-                options.startIn = appSettings.downloadFolderHandle;
-            }
-
-            const fileHandle = await window.showSaveFilePicker(options);
-
-            // Write the file
-            const writable = await fileHandle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-
-            return true;
-        }
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            console.log('User cancelled save dialog');
-            return false; // Don't fall back if user cancelled
-        }
-        console.log('Save picker failed, falling back to browser download:', error);
-    }
-
-    // Fallback to standard browser download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    return true;
-}
-
-/**
- * Download Excel workbook to preferred folder or fallback to browser download
- * @param {Object} workbook - XLSX workbook object
- * @param {string} filename - Target filename
- * @returns {Promise<boolean>} Success status
- */
-async function downloadExcelToPreferredFolder(workbook, filename) {
-    console.log('downloadExcelToPreferredFolder called with filename:', filename);
-    console.log('showSaveFilePicker available:', 'showSaveFilePicker' in window);
-    console.log('downloadFolderHandle:', appSettings.downloadFolderHandle);
-
-    try {
-        // Check if File System Access API is available
-        if ('showSaveFilePicker' in window) {
-            // Convert workbook to array buffer first
-            const arrayBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-
-            // Use showSaveFilePicker with preferred folder as starting directory
-            const options = {
-                suggestedName: filename,
-                types: [{
-                    description: 'Excel files',
-                    accept: {'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']}
-                }]
-            };
-
-            // If we have a folder handle, use it as starting directory suggestion
-            if (appSettings.downloadFolderHandle) {
-                options.startIn = appSettings.downloadFolderHandle;
-            }
-
-            const fileHandle = await window.showSaveFilePicker(options);
-
-            // Write the file
-            const writable = await fileHandle.createWritable();
-            await writable.write(arrayBuffer);
-            await writable.close();
-
-            return true;
-        }
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            console.log('User cancelled save dialog');
-            return false; // Don't fall back if user cancelled
-        }
-        console.log('Save picker failed, falling back to browser download:', error);
-    }
-
-    // Fallback to standard XLSX download
-    XLSX.writeFile(workbook, filename);
-    return true;
-}
+// downloadToPreferredFolder is defined in fileManager.js and exported to window
+// downloadExcelToPreferredFolder is defined in fileManager.js and exported to window
 
 // ========== RESULTS TAB FUNCTIONS ==========
 
@@ -2222,71 +1860,7 @@ function handleSearchInput(e) {
     });
 }
 
-/**
- * Download combined data as Excel file
- */
-async function downloadCombinedExcel() {
-    console.log('downloadCombinedExcel called');
-    console.log('currentCombinedData:', window.currentCombinedData?.length);
-    console.log('appSettings:', appSettings);
-
-    if (!window.currentCombinedData || window.currentCombinedData.length === 0) {
-        alert('No processed data available for download.');
-        return;
-    }
-
-    try {
-        // Define the 22-column template order
-        const columnOrder = [
-            'Makelaar', 'Boekingsperiode', 'Polisnr makelaar', 'Verzekerde', 'Branche',
-            'Periode van', 'Periode tot', 'Valuta', 'Bruto', 'Provisie%',
-            'Provisie', 'Tekencom%', 'Tekencom', 'Netto', 'BAB',
-            'Land', 'Aandeel Allianz', 'Tekenjaar', 'Boekdatum tp', 'FactuurDtm',
-            'FactuurNr', 'Boekingsreden'
-        ];
-
-        // Clean data for export and ensure all 22 columns are present
-        const exportData = window.currentCombinedData.map(row => {
-            const cleanRow = {};
-
-            // First, add all columns in the correct order
-            columnOrder.forEach(columnName => {
-                cleanRow[columnName] = row[columnName] || '';
-            });
-
-            // Then add any additional columns that aren't internal fields
-            Object.keys(row).forEach(key => {
-                if (!key.startsWith('_') && !columnOrder.includes(key)) {
-                    cleanRow[key] = row[key];
-                }
-            });
-
-            return cleanRow;
-        });
-
-        // Create Excel workbook
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(exportData);
-
-        // Add worksheet
-        XLSX.utils.book_append_sheet(wb, ws, 'Processed Data');
-
-        // Generate filename with timestamp
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-        const filename = `Borderellen_Combined_${timestamp}.xlsx`;
-
-        // Download to preferred folder or fallback to browser download
-        const success = await downloadExcelToPreferredFolder(wb, filename);
-
-        if (success) {
-            alert(`Downloaded ${exportData.length} records successfully`);
-        }
-
-    } catch (error) {
-        console.error('Error downloading Excel:', error);
-        alert(`Failed to download Excel file: ${error.message}`);
-    }
-}
+// downloadCombinedExcel function now lives in resultsManager.js
 
 /**
  * Export combined data as JSON file
@@ -2754,8 +2328,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         templateId: detection.template.id
                     };
 
+                    console.log('Set broker info on fileData:', fileData.broker);
+
                     // Load column mapping
                     window.currentMapping = { ...detection.template.columnMapping };
+                    console.log('Loaded mapping from template:', Object.keys(window.currentMapping).length, 'mappings');
 
                     // Show mapping summary
                     showMappingSummary(detection.template.name, 'Saved Template');
