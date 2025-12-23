@@ -136,10 +136,15 @@ function updateResultsTab() {
  * Display processing overview with file summaries
  * @param {Array} processedFiles - Successfully processed files
  */
-function displayProcessingOverview(processedFiles) {
+async function displayProcessingOverview(processedFiles) {
     const totalRecords = processedFiles.reduce((sum, f) => sum + f.parsedData.length, 0);
     const totalFiles = processedFiles.length;
     const allFiles = window.uploadedFiles?.length || 0;
+
+    // Get column count from active template
+    const templateColumns = window.borderellenTemplate?.columns || [];
+    const columnCount = templateColumns.length > 0 ? templateColumns.length :
+                       Object.keys(processedFiles[0].parsedData[0]).filter(k => !k.startsWith('_')).length;
 
     const overview = document.getElementById('processing-overview');
     overview.innerHTML = `
@@ -151,7 +156,7 @@ function displayProcessingOverview(processedFiles) {
                 <strong>Processed Files:</strong> ${totalFiles} of ${allFiles}
             </div>
             <div style="background: #333; padding: 12px; border-radius: 6px;">
-                <strong>Format:</strong> Standard 22-column template
+                <strong>Columns:</strong> ${columnCount}
             </div>
         </div>
 
@@ -175,7 +180,7 @@ function displayProcessingOverview(processedFiles) {
  * @param {Array} combinedData - All processed records from all files
  * @param {Array} processedFiles - Source files for reference
  */
-function displayCombinedResults(combinedData, processedFiles) {
+async function displayCombinedResults(combinedData, processedFiles) {
     const tableHead = document.getElementById('results-table-head');
     const tableBody = document.getElementById('results-table-body');
     const recordCountDisplay = document.getElementById('record-count-display');
@@ -189,7 +194,10 @@ function displayCombinedResults(combinedData, processedFiles) {
 
     // Get columns from active template (always show all template columns)
     const templateColumns = window.borderellenTemplate?.columns || [];
-    const columns = templateColumns.map(col => col.name);
+    const columns = templateColumns.length > 0 ? templateColumns.map(col => col.name) :
+                   Object.keys(combinedData[0]).filter(key => !key.startsWith('_'));
+
+    console.log('Results table columns (ALL template columns):', columns);
 
     // Create table headers
     tableHead.innerHTML = `
@@ -284,37 +292,28 @@ async function downloadCombinedExcel() {
     }
 
     try {
-        // Define the 22-column template order
-        const columnOrder = [
-            'Makelaar', 'Boekingsperiode', 'Polisnr makelaar', 'Verzekerde', 'Branche',
-            'Periode van', 'Periode tot', 'Valuta', 'Bruto', 'Provisie%',
-            'Provisie', 'Tekencom%', 'Tekencom', 'Netto', 'BAB',
-            'Land', 'Aandeel Allianz', 'Tekenjaar', 'Boekdatum tp', 'FactuurDtm',
-            'FactuurNr', 'Boekingsreden'
-        ];
+        // Get ALL columns from active template (same as what's shown in Results table)
+        const templateCols = window.borderellenTemplate?.columns || [];
+        const templateColumns = templateCols.length > 0 ? templateCols.map(col => col.name) :
+                               Object.keys(window.currentCombinedData[0]).filter(key => !key.startsWith('_'));
 
-        // Clean data for export and ensure all 22 columns are present
+        console.log('Template columns for export:', templateColumns);
+
+        // Clean data for export - include ALL template columns (empty if not mapped)
         const exportData = window.currentCombinedData.map(row => {
             const cleanRow = {};
 
-            // First, add all columns in the correct order
-            columnOrder.forEach(columnName => {
+            // Add all template columns in order
+            templateColumns.forEach(columnName => {
                 cleanRow[columnName] = row[columnName] || '';
-            });
-
-            // Then add any additional columns that aren't internal fields
-            Object.keys(row).forEach(key => {
-                if (!key.startsWith('_') && !columnOrder.includes(key)) {
-                    cleanRow[key] = row[key];
-                }
             });
 
             return cleanRow;
         });
 
-        // Create Excel workbook
+        // Create Excel workbook with explicit column order (all template columns)
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(exportData);
+        const ws = XLSX.utils.json_to_sheet(exportData, { header: templateColumns });
 
         // Add worksheet
         XLSX.utils.book_append_sheet(wb, ws, 'Processed Data');
