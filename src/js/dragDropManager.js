@@ -361,6 +361,103 @@ async function loadSourceColumns(fileId) {
     if (!fileData) return;
 
     window.currentMappingFile = fileData;
+
+    // Clear old context first - will be restored below if this file has a saved template
+    if (window.clearFileMappingContext) {
+        window.clearFileMappingContext();
+    }
+
+    // Check if this file has a saved template and restore the context
+    if (fileData.broker && fileData.broker.type === 'custom' && fileData.broker.templateId) {
+        console.log(`File has saved template: ${fileData.broker.name} (ID: ${fileData.broker.templateId})`);
+
+        // Load the template to restore mappings
+        try {
+            const allMappings = await window.loadAllFileMappings();
+            const template = allMappings.find(t => t.id === fileData.broker.templateId);
+
+            if (template) {
+                // Restore the file mapping context
+                if (window.saveFileMappingContext) {
+                    window.saveFileMappingContext(fileData, template.id, template.name);
+                }
+
+                // Restore the column mapping
+                window.currentMapping = { ...template.columnMapping };
+
+                // CRITICAL: Restore pattern analysis from saved parsing config
+                if (template.parsingConfig) {
+                    // Calculate endColumn from headerRange if endColumn is missing (old templates)
+                    let endColumnIndex = template.parsingConfig.endColumn;
+
+                    if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerRange) {
+                        const rangeMatch = template.parsingConfig.headerRange.match(/:([A-Z]+)\d+$/);
+                        if (rangeMatch) {
+                            endColumnIndex = XLSX.utils.decode_col(rangeMatch[1]);
+                            console.log(`Calculated endColumn from headerRange: ${rangeMatch[1]} = ${endColumnIndex}`);
+                        }
+                    }
+
+                    if ((endColumnIndex === undefined || endColumnIndex === null) && template.parsingConfig.headerColumns) {
+                        const startCol = template.parsingConfig.skipColumns || 0;
+                        endColumnIndex = startCol + template.parsingConfig.headerColumns - 1;
+                        console.log(`Calculated endColumn from headerColumns: ${startCol} + ${template.parsingConfig.headerColumns} - 1 = ${endColumnIndex}`);
+                    }
+
+                    window.currentPatternAnalysis = {
+                        dataSection: {
+                            headerRowIndex: template.parsingConfig.headerRow,
+                            dataStartIndex: template.parsingConfig.skipRows,
+                            startColumnIndex: template.parsingConfig.skipColumns,
+                            endColumnIndex: endColumnIndex
+                        },
+                        manualSelection: template.parsingConfig.headerRows ? {
+                            headerRows: template.parsingConfig.headerRows,
+                            headerColumns: template.parsingConfig.headerColumns,
+                            headerRange: template.parsingConfig.headerRange,
+                            footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                        } : null,
+                        suggestedHeaderRow: template.parsingConfig.headerRow,
+                        suggestedDataEnd: template.parsingConfig.dataEndRow,
+                        autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
+                        confidence: 1.0
+                    };
+                    console.log(`Restored pattern analysis from template:`, window.currentPatternAnalysis);
+                }
+
+                console.log(`Restored template context: ${template.name} with ${Object.keys(window.currentMapping).length} mappings`);
+
+                // Store restored analysis in fileData to prevent re-analysis overwriting it
+                fileData.patternAnalysis = window.currentPatternAnalysis;
+
+                // Update UI buttons to show "Update Template" instead of "Save New Template"
+                if (window.updateMappingButtons) {
+                    window.updateMappingButtons();
+                }
+
+                // Load columns with restored analysis FIRST so DOM has source columns
+                const container = document.getElementById('source-columns');
+                await loadSourceColumnsFromAnalysis(fileData.file, window.currentPatternAnalysis, container);
+
+                // THEN restore cleanup rules (filters) to UI - now source columns are in DOM
+                if (template.cleanupRules && window.restoreCleanupRulesToUI) {
+                    window.restoreCleanupRulesToUI(template.cleanupRules);
+                }
+
+                // Update template drop zones to display FIXED: and CALC: mappings visually
+                if (window.updateTemplateDropZones) {
+                    updateTemplateDropZones();
+                }
+
+                return;
+            } else {
+                console.warn(`Template ${fileData.broker.templateId} not found in database`);
+            }
+        } catch (error) {
+            console.error('Error restoring template context:', error);
+        }
+    }
+
     const container = document.getElementById('source-columns');
 
     try {
@@ -505,12 +602,24 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
                 container.innerHTML = confidenceInfo;
                 displaySourceColumns(headers);
 
-                // Trigger auto-mapping for high-confidence detections
-                if (patternAnalysis.confidence > 0.7) {
-                    console.log('High confidence detection - triggering auto-mapping');
+                // Trigger auto-mapping for high-confidence detections ONLY if no saved mapping exists
+                const hasSavedMapping = window.currentMapping && Object.keys(window.currentMapping).length > 0;
+                const hasSavedTemplate = window.currentMappingFile?.broker?.type === 'custom' && window.currentMappingFile?.broker?.templateId;
+
+                console.log('=== AUTO-MAPPING CHECK (dragDropManager.js) ===');
+                console.log('confidence:', patternAnalysis.confidence);
+                console.log('hasSavedMapping:', hasSavedMapping, '- mapping count:', Object.keys(window.currentMapping || {}).length);
+                console.log('hasSavedTemplate:', hasSavedTemplate);
+                console.log('broker info:', window.currentMappingFile?.broker);
+                console.log('currentMapping:', window.currentMapping);
+
+                if (patternAnalysis.confidence > 0.7 && !hasSavedMapping && !hasSavedTemplate) {
+                    console.log('❌ TRIGGERING AUTO-MAPPING - THIS WILL CLEAR YOUR MAPPINGS!');
                     setTimeout(() => {
                         window.generateAutoMappingSuggestions();
                     }, 200); // Small delay to ensure columns are loaded
+                } else if (hasSavedMapping || hasSavedTemplate) {
+                    console.log('✅ SKIPPING AUTO-MAPPING - PRESERVING SAVED MAPPINGS');
                 }
 
     } catch (error) {
