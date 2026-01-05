@@ -111,6 +111,7 @@ async function restoreFileMappingContext() {
                             }
 
                             window.currentPatternAnalysis = {
+                                filename: fileData.name, // Add filename for formula testing
                                 dataSection: {
                                     headerRowIndex: template.parsingConfig.headerRow,
                                     dataStartIndex: template.parsingConfig.skipRows,
@@ -324,6 +325,7 @@ async function editFileMappingFromTable(templateId, templateName) {
             // Store pattern analysis if available BEFORE loading columns
             if (template.parsingConfig) {
                 window.currentPatternAnalysis = {
+                    filename: window.currentMappingFile?.file?.name || 'unknown', // Add filename for formula testing
                     dataSection: {
                         headerRowIndex: template.parsingConfig.headerRow,
                         dataStartIndex: template.parsingConfig.skipRows,
@@ -1494,6 +1496,7 @@ async function handleBrokerTemplateImport(event) {
             }
 
             window.currentPatternAnalysis = {
+                filename: window.currentMappingFile?.file?.name || 'unknown', // Add filename for formula testing
                 dataSection: {
                     headerRowIndex: template.parsingConfig.headerRow,
                     dataStartIndex: template.parsingConfig.skipRows,

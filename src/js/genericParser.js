@@ -784,6 +784,14 @@ class GenericBrokerParser {
         };
 
         console.log('Created parser config:', config);
+        console.log(`DEBUG: headerRow=${config.headerRow}, headerRows=${config.headerRows}, dataStartIndex=${config.skipRows}`);
+        console.log(`DEBUG: For ${config.headerRows} header rows, data should start at row ${config.headerRow + config.headerRows}`);
+
+        if (config.headerRows > 1 && config.skipRows !== config.headerRow + config.headerRows) {
+            console.warn(`⚠️ POTENTIAL BUG: Multi-row headers detected but dataStartIndex may be incorrect!`);
+            console.warn(`   Expected: dataStartIndex = ${config.headerRow} + ${config.headerRows} = ${config.headerRow + config.headerRows}`);
+            console.warn(`   Actual: dataStartIndex = ${config.skipRows}`);
+        }
 
         // Create parser instance and parse
         const parser = new GenericBrokerParser(config);

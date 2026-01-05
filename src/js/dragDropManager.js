@@ -405,6 +405,7 @@ async function loadSourceColumns(fileId) {
                     }
 
                     window.currentPatternAnalysis = {
+                        filename: fileData.name, // Add filename for formula testing
                         dataSection: {
                             headerRowIndex: template.parsingConfig.headerRow,
                             dataStartIndex: template.parsingConfig.skipRows,
@@ -535,7 +536,8 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
                             let headerText = '';
 
                             if (cell && cell.v) {
-                                headerText = cell.v.toString().trim();
+                                // Normalize whitespace: remove newlines/tabs and collapse multiple spaces
+                                headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
                             } else {
                                 headerText = `Row${row + 1}_Col${XLSX.utils.encode_col(col)}`;
                             }
@@ -551,7 +553,8 @@ async function loadSourceColumnsFromAnalysis(file, patternAnalysis, container) {
                         let headerText = '';
 
                         if (cell && cell.v) {
-                            headerText = cell.v.toString().trim();
+                            // Normalize whitespace: remove newlines/tabs and collapse multiple spaces
+                            headerText = cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
                         } else {
                             headerText = `Column ${XLSX.utils.encode_col(col)}`;
                         }
@@ -639,7 +642,8 @@ function loadHeadersFromManualSelection(worksheet, headerRowIndex, range, contai
         const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: col });
         const cell = worksheet[cellAddress];
         if (cell && cell.v) {
-            headers.push(cell.v.toString().trim());
+            // Normalize whitespace: remove newlines/tabs and collapse multiple spaces
+            headers.push(cell.v.toString().replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim());
         } else {
             headers.push(`Column ${XLSX.utils.encode_col(col)}`);
         }
