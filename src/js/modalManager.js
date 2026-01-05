@@ -315,7 +315,9 @@ async function testFormula() {
 async function getTestDataForFormula() {
     console.log('getTestDataForFormula: currentMappingFile exists:', !!window.currentMappingFile);
     console.log('getTestDataForFormula: file exists:', !!window.currentMappingFile?.file);
+    console.log('getTestDataForFormula: file name:', window.currentMappingFile?.file?.name);
     console.log('getTestDataForFormula: currentPatternAnalysis exists:', !!window.currentPatternAnalysis);
+    console.log('getTestDataForFormula: currentPatternAnalysis.filename:', window.currentPatternAnalysis?.filename);
 
     // Validate that we have file context - this is required for template creation workflow
     if (!window.currentMappingFile || !window.currentMappingFile.file) {
@@ -335,6 +337,13 @@ async function getTestDataForFormula() {
         // Use pattern analysis if available, otherwise simple extraction
         if (window.currentPatternAnalysis && window.GenericParser && typeof window.GenericParser.parseWithAnalysis === 'function') {
             console.log('Using GenericParser with pattern analysis');
+
+            // FIX: Ensure filename is set if missing
+            if (!window.currentPatternAnalysis.filename && window.currentMappingFile?.file?.name) {
+                console.warn('currentPatternAnalysis missing filename, adding it now:', window.currentMappingFile.file.name);
+                window.currentPatternAnalysis.filename = window.currentMappingFile.file.name;
+            }
+
             const sampleData = await window.GenericParser.parseWithAnalysis(workbook, window.currentPatternAnalysis);
             return sampleData.slice(0, 5);
         } else {

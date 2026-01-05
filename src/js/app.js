@@ -259,6 +259,29 @@ async function loadTemplateMapping(templateId) {
             window.currentMapping = { ...template.columnMapping };
             console.log('Template mapping loaded:', window.currentMapping);
 
+            // Restore pattern analysis if available (CRITICAL for formula testing)
+            if (template.parsingConfig) {
+                window.currentPatternAnalysis = {
+                    filename: window.currentMappingFile?.file?.name || 'unknown', // Add filename for formula testing
+                    dataSection: {
+                        headerRowIndex: template.parsingConfig.headerRow,
+                        dataStartIndex: template.parsingConfig.skipRows,
+                        startColumnIndex: template.parsingConfig.skipColumns,
+                        endColumnIndex: template.parsingConfig.endColumn
+                    },
+                    manualSelection: template.parsingConfig.headerRows ? {
+                        headerRows: template.parsingConfig.headerRows,
+                        headerColumns: template.parsingConfig.headerColumns,
+                        headerRange: template.parsingConfig.headerRange,
+                        footerKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword
+                    } : null,
+                    suggestedHeaderRow: template.parsingConfig.headerRow,
+                    autoFooterKeyword: template.parsingConfig.footerRowKeyword || template.parsingConfig.footerKeyword,
+                    confidence: 1.0
+                };
+                console.log('Restored pattern analysis from template:', window.currentPatternAnalysis);
+            }
+
             // Update drop zones to show the loaded mappings
             updateTemplateDropZones();
 
